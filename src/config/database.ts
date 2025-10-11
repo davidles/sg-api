@@ -5,7 +5,7 @@ dotenv.config();
 
 const dbHost = process.env.DB_HOST || 'localhost';
 const dbPort = Number(process.env.DB_PORT || 3306);
-const dbName = process.env.DB_NAME || 'secretaria_general';
+const dbName = process.env.DB_NAME || 'secretary-portal';
 const dbUser = process.env.DB_USER || 'root';
 const dbPassword = process.env.DB_PASSWORD || '';
 
