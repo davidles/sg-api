@@ -7,11 +7,15 @@ import {
   AcademicProgramModel
 } from './academicProgram';
 import { initStudyPlanModel, StudyPlanModel } from './studyPlan';
+import { initTitleStatusModel, TitleStatusModel } from './titleStatus';
+import { initRequestTypeModel, RequestTypeModel } from './requestType';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
 const academicProgram = initAcademicProgramModel(sequelize);
 const studyPlan = initStudyPlanModel(sequelize);
+const titleStatus = initTitleStatusModel(sequelize);
+const requestType = initRequestTypeModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -43,11 +47,23 @@ title.belongsTo(studyPlan, {
   as: 'studyPlan'
 });
 
+title.belongsTo(titleStatus, {
+  foreignKey: 'idTitleStatus',
+  as: 'titleStatus'
+});
+
+title.belongsTo(requestType, {
+  foreignKey: 'idRequestType',
+  as: 'requestType'
+});
+
 const models = {
   title,
   faculty,
   academicProgram,
-  studyPlan
+  studyPlan,
+  titleStatus,
+  requestType
 };
 
 type DbModels = typeof models;
@@ -57,7 +73,9 @@ export type {
   TitleModel,
   FacultyModel,
   AcademicProgramModel,
-  StudyPlanModel
+  StudyPlanModel,
+  TitleStatusModel,
+  RequestTypeModel
 };
 export { sequelize };
 export default models;

@@ -32,7 +32,8 @@ export const initTitleModel = (sequelize: Sequelize): TitleModel => {
     },
     {
       tableName: 'Title',
-      timestamps: false
+      timestamps: false,
+      freezeTableName: true
     }
   );
 
