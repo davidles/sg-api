@@ -1,12 +1,12 @@
 export interface RequestRequirementInstanceAttributes {
   idRequestRequirementInstance: number;
-  idRequest: number | null;
-  idRequirement: number | null;
-  idCompletedByUser: number | null;
+  requestId: number | null;
+  requirementId: number | null;
+  completedByUserId: number | null;
   completedAt: string | null;
-  idVerifiedByUser: number | null;
+  verifiedByUserId: number | null;
   verifiedAt: string | null;
-  idCurrentRequirementStatus: number | null;
+  currentRequirementStatusId: number | null;
   complianceVersion: number | null;
   reviewReason: string | null;
 }

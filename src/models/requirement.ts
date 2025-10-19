@@ -15,22 +15,25 @@ export const initRequirementModel = (sequelize: Sequelize): RequirementModel => 
     'Requirement',
     {
       idRequirement: {
+        field: 'idRequisito',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
       requirementName: {
-        type: DataTypes.STRING(50),
-        allowNull: false
+        field: 'requisitoNombre',
+        type: DataTypes.STRING(255),
+        allowNull: true
       },
       requirementDescription: {
+        field: 'requisitoDescripcion',
         type: DataTypes.TEXT('medium'),
         allowNull: true
       }
     },
     {
-      tableName: 'Requirement',
+      tableName: 'requisito',
       timestamps: false,
       freezeTableName: true
     }

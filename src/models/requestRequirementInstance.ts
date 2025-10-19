@@ -17,50 +17,60 @@ export const initRequestRequirementInstanceModel = (
     'RequestRequirementInstance',
     {
       idRequestRequirementInstance: {
+        field: 'idRequestRequirementInstance',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
-      idRequest: {
+      requestId: {
+        field: 'idRequest',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
-      idRequirement: {
+      requirementId: {
+        field: 'idRequirement',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
-      idCompletedByUser: {
+      completedByUserId: {
+        field: 'idCompletedByUser',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       completedAt: {
+        field: 'completedAt',
         type: DataTypes.DATEONLY,
         allowNull: true
       },
-      idVerifiedByUser: {
+      verifiedByUserId: {
+        field: 'idVerifiedByUser',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       verifiedAt: {
+        field: 'verifiedAt',
         type: DataTypes.DATEONLY,
         allowNull: true
       },
-      idCurrentRequirementStatus: {
+      currentRequirementStatusId: {
+        field: 'idCurrentRequirementStatus',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       complianceVersion: {
+        field: 'complianceVersion',
         type: DataTypes.INTEGER,
         allowNull: true
       },
       reviewReason: {
+        field: 'reviewReason',
         type: DataTypes.TEXT('long'),
         allowNull: true
       }
     },
     {
-      tableName: 'RequestRequirementInstance',
+      tableName: 'requestrequirementinstance',
       timestamps: false,
       freezeTableName: true
     }

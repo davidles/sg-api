@@ -16,23 +16,26 @@ export const initRequestTypeRequirementModel = (
   const requestTypeRequirement = sequelize.define<RequestTypeRequirementInstance>(
     'RequestTypeRequirement',
     {
-      idRequestType: {
+      requestTypeId: {
+        field: 'idTipoSolicitud',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         primaryKey: true
       },
-      idRequirement: {
+      requirementId: {
+        field: 'idRequisito',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         primaryKey: true
       },
       isRequired: {
+        field: 'requisitoObligatorio',
         type: DataTypes.TINYINT,
         allowNull: true
       }
     },
     {
-      tableName: 'RequestTypeRequirement',
+      tableName: 'tipoSolicitudRequisito',
       timestamps: false,
       freezeTableName: true
     }

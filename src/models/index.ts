@@ -57,12 +57,12 @@ academicProgram.belongsTo(faculty, {
 });
 
 academicProgram.hasMany(studyPlan, {
-  foreignKey: 'idAcademicProgram',
+  foreignKey: 'careerId',
   as: 'studyPlans'
 });
 
 studyPlan.belongsTo(academicProgram, {
-  foreignKey: 'idAcademicProgram',
+  foreignKey: 'careerId',
   as: 'academicProgram'
 });
 
@@ -86,18 +86,8 @@ title.belongsTo(requestType, {
   as: 'requestType'
 });
 
-title.hasMany(request, {
-  foreignKey: 'idTitle',
-  as: 'requests'
-});
-
-request.belongsTo(title, {
-  foreignKey: 'idTitle',
-  as: 'title'
-});
-
 request.belongsTo(requestType, {
-  foreignKey: 'idRequestType',
+  foreignKey: 'requestTypeId',
   as: 'requestType'
 });
 
@@ -117,37 +107,37 @@ request.hasMany(requestStatusHistory, {
 });
 
 requestRequirementInstance.belongsTo(request, {
-  foreignKey: 'idRequest',
+  foreignKey: 'requestId',
   as: 'request'
 });
 
 requestRequirementInstance.belongsTo(requirement, {
-  foreignKey: 'idRequirement',
+  foreignKey: 'requirementId',
   as: 'requirement'
 });
 
 requestRequirementInstance.belongsTo(requirementInstanceStatus, {
-  foreignKey: 'idCurrentRequirementStatus',
+  foreignKey: 'currentRequirementStatusId',
   as: 'status'
 });
 
 request.hasMany(requestRequirementInstance, {
-  foreignKey: 'idRequest',
+  foreignKey: 'requestId',
   as: 'requirementInstances'
 });
 
 requestType.hasMany(requestTypeRequirement, {
-  foreignKey: 'idRequestType',
+  foreignKey: 'requestTypeId',
   as: 'requirements'
 });
 
 requestTypeRequirement.belongsTo(requestType, {
-  foreignKey: 'idRequestType',
+  foreignKey: 'requestTypeId',
   as: 'requestType'
 });
 
 requestTypeRequirement.belongsTo(requirement, {
-  foreignKey: 'idRequirement',
+  foreignKey: 'requirementId',
   as: 'requirement'
 });
 
@@ -171,11 +161,6 @@ user.belongsTo(person, {
   as: 'person'
 });
 
-graduate.hasMany(title, {
-  foreignKey: 'studyPlanId',
-  as: 'titles'
-});
-
 const models = {
   title,
   faculty,
@@ -189,7 +174,10 @@ const models = {
   requirement,
   requirementInstanceStatus,
   requestRequirementInstance,
-  requestTypeRequirement
+  requestTypeRequirement,
+  person,
+  graduate,
+  user
 };
 
 type DbModels = typeof models;

@@ -1,6 +1,6 @@
 export interface RequestTypeRequirementAttributes {
-  idRequestType: number;
-  idRequirement: number;
+  requestTypeId: number;
+  requirementId: number;
   isRequired: number | null;
 }
 

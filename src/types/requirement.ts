@@ -1,6 +1,6 @@
 export interface RequirementAttributes {
   idRequirement: number;
-  requirementName: string;
+  requirementName: string | null;
   requirementDescription: string | null;
 }
 

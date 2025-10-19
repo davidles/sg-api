@@ -69,9 +69,8 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const createdRequest = await models.request.create(
       {
-        idUser,
-        idTitle,
-        idRequestType,
+        userId: idUser,
+        requestTypeId: idRequestType,
         generatedAt
       },
       { transaction }
@@ -79,7 +78,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const requestRequirements = await models.requestTypeRequirement.findAll({
       where: {
-        idRequestType,
+        requestTypeId: idRequestType,
         isRequired: 1
       },
       transaction
@@ -88,9 +87,9 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     if (requestRequirements.length > 0) {
       await models.requestRequirementInstance.bulkCreate(
         requestRequirements.map((requirement) => ({
-          idRequest: createdRequest.getDataValue('idRequest'),
-          idRequirement: requirement.getDataValue('idRequirement'),
-          idCurrentRequirementStatus: requirementInstanceStatus.getDataValue(
+          requestId: createdRequest.getDataValue('idRequest'),
+          requirementId: requirement.getDataValue('requirementId'),
+          currentRequirementStatusId: requirementInstanceStatus.getDataValue(
             'idRequirementInstanceStatus'
           ),
           complianceVersion: 1
@@ -110,7 +109,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     );
 
     await models.title.update(
-      { idTitleStatus: TITLE_STATUS_IN_PROCESS_ID },
+      { titleStatusId: TITLE_STATUS_IN_PROCESS_ID },
       {
         where: { idTitle },
         transaction
