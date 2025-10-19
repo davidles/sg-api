@@ -2,10 +2,7 @@ import { Sequelize } from 'sequelize';
 import { sequelize } from '../config/database';
 import { initTitleModel, TitleModel } from './title';
 import { initFacultyModel, FacultyModel } from './faculty';
-import {
-  initAcademicProgramModel,
-  AcademicProgramModel
-} from './academicProgram';
+import { initAcademicProgramModel, AcademicProgramModel } from './academicProgram';
 import { initStudyPlanModel, StudyPlanModel } from './studyPlan';
 import { initTitleStatusModel, TitleStatusModel } from './titleStatus';
 import { initRequestTypeModel, RequestTypeModel } from './requestType';
@@ -28,6 +25,9 @@ import {
   initRequestTypeRequirementModel,
   RequestTypeRequirementModel
 } from './requestTypeRequirement';
+import { initPersonModel, PersonModel } from './person';
+import { initGraduateModel, GraduateModel } from './graduate';
+import { initUserModel, UserModel } from './user';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
@@ -42,6 +42,9 @@ const requirement = initRequirementModel(sequelize);
 const requirementInstanceStatus = initRequirementInstanceStatusModel(sequelize);
 const requestRequirementInstance = initRequestRequirementInstanceModel(sequelize);
 const requestTypeRequirement = initRequestTypeRequirementModel(sequelize);
+const person = initPersonModel(sequelize);
+const graduate = initGraduateModel(sequelize);
+const user = initUserModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -64,22 +67,22 @@ studyPlan.belongsTo(academicProgram, {
 });
 
 studyPlan.hasMany(title, {
-  foreignKey: 'idStudyPlan',
+  foreignKey: 'studyPlanId',
   as: 'titles'
 });
 
 title.belongsTo(studyPlan, {
-  foreignKey: 'idStudyPlan',
+  foreignKey: 'studyPlanId',
   as: 'studyPlan'
 });
 
 title.belongsTo(titleStatus, {
-  foreignKey: 'idTitleStatus',
+  foreignKey: 'titleStatusId',
   as: 'titleStatus'
 });
 
 title.belongsTo(requestType, {
-  foreignKey: 'idRequestType',
+  foreignKey: 'requestTypeId',
   as: 'requestType'
 });
 
@@ -146,6 +149,31 @@ requestTypeRequirement.belongsTo(requestType, {
 requestTypeRequirement.belongsTo(requirement, {
   foreignKey: 'idRequirement',
   as: 'requirement'
+});
+
+person.hasOne(graduate, {
+  foreignKey: 'personId',
+  as: 'graduate'
+});
+
+graduate.belongsTo(person, {
+  foreignKey: 'personId',
+  as: 'person'
+});
+
+person.hasOne(user, {
+  foreignKey: 'personId',
+  as: 'user'
+});
+
+user.belongsTo(person, {
+  foreignKey: 'personId',
+  as: 'person'
+});
+
+graduate.hasMany(title, {
+  foreignKey: 'studyPlanId',
+  as: 'titles'
 });
 
 const models = {

@@ -9,29 +9,39 @@ export const initTitleModel = (sequelize: Sequelize): TitleModel => {
     'Title',
     {
       idTitle: {
+        field: 'idTitulo',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
-      idStudyPlan: {
+      studyPlanId: {
+        field: 'tituloIdPlanEstudio',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       titleName: {
-        type: DataTypes.STRING(100),
-        allowNull: false
+        field: 'tituloNombre',
+        type: DataTypes.STRING(255),
+        allowNull: true
       },
-      idTitleStatus: {
+      titleTypeId: {
+        field: 'tituloIdTituloTipo',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
-      idRequestType: {
+      requestTypeId: {
+        field: 'tituloIdSolicitudTipo',
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true
+      },
+      titleStatusId: {
+        field: 'tituloIdTituloEstado',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       }
     },
     {
-      tableName: 'Title',
+      tableName: 'titulo',
       timestamps: false,
       freezeTableName: true
     }

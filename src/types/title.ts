@@ -1,9 +1,10 @@
 export interface TitleAttributes {
   idTitle: number;
-  idStudyPlan: number | null;
-  titleName: string;
-  idTitleStatus: number | null;
-  idRequestType: number | null;
+  studyPlanId: number | null;
+  titleName: string | null;
+  titleTypeId: number | null;
+  requestTypeId: number | null;
+  titleStatusId: number | null;
 }
 
 export type TitleCreationAttributes = Omit<TitleAttributes, 'idTitle'>;

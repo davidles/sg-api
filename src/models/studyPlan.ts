@@ -9,21 +9,24 @@ export const initStudyPlanModel = (sequelize: Sequelize): StudyPlanModel => {
     'StudyPlan',
     {
       idStudyPlan: {
+        field: 'idPlanEstudio',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
       studyPlanName: {
-        type: DataTypes.STRING(50),
-        allowNull: false
+        field: 'planEstudioNombre',
+        type: DataTypes.STRING(255),
+        allowNull: true
       },
-      idAcademicProgram: {
+      careerId: {
+        field: 'planEstudioIdCarrera',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       }
     },
     {
-      tableName: 'StudyPlan',
+      tableName: 'planEstudio',
       timestamps: false,
       freezeTableName: true
     }
