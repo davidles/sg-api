@@ -1,9 +1,8 @@
 export interface RequestAttributes {
   idRequest: number;
-  idUser: number | null;
-  idRequestType: number | null;
-  idTitle: number | null;
-  generatedAt: Date | string | null;
+  userId: number | null;
+  requestTypeId: number | null;
+  generatedAt: string | null;
 }
 
 export type RequestCreationAttributes = Omit<RequestAttributes, 'idRequest'>;

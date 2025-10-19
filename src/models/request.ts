@@ -9,30 +9,30 @@ export const initRequestModel = (sequelize: Sequelize): RequestModel => {
     'Request',
     {
       idRequest: {
+        field: 'idSolicitud',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
-      idUser: {
+      userId: {
+        field: 'solicitudIdUsuario',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
-      idRequestType: {
-        type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true
-      },
-      idTitle: {
+      requestTypeId: {
+        field: 'solicitudIdTipoSolicitud',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       generatedAt: {
+        field: 'solicitudFechaGeneracion',
         type: DataTypes.DATEONLY,
         allowNull: true
       }
     },
     {
-      tableName: 'Request',
+      tableName: 'solicitud',
       timestamps: false,
       freezeTableName: true
     }

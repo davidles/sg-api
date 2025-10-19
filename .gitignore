@@ -6,7 +6,9 @@ dist/
 
 # Environment files
 .env
-.env.local
+
+schema-inspect.txt
+listTables.js
 
 # Logs
 npm-debug.log*
