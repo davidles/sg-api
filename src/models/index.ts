@@ -29,6 +29,12 @@ import { initPersonModel, PersonModel } from './person';
 import { initGraduateModel, GraduateModel } from './graduate';
 import { initUserModel, UserModel } from './user';
 import { initContactModel, ContactModel } from './contact';
+import { initAddressModel, AddressModel } from './address';
+import { initCityModel, CityModel } from './city';
+import { initProvinceModel, ProvinceModel } from './province';
+import { initCountryModel, CountryModel } from './country';
+import { initForceModel, ForceModel } from './force';
+import { initMilitaryRankModel, MilitaryRankModel } from './militaryRank';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
@@ -47,6 +53,12 @@ const person = initPersonModel(sequelize);
 const graduate = initGraduateModel(sequelize);
 const user = initUserModel(sequelize);
 const contact = initContactModel(sequelize);
+const address = initAddressModel(sequelize);
+const city = initCityModel(sequelize);
+const province = initProvinceModel(sequelize);
+const country = initCountryModel(sequelize);
+const force = initForceModel(sequelize);
+const militaryRank = initMilitaryRankModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -173,6 +185,66 @@ contact.belongsTo(person, {
   as: 'person'
 });
 
+person.hasOne(address, {
+  foreignKey: 'personId',
+  as: 'address'
+});
+
+address.belongsTo(person, {
+  foreignKey: 'personId',
+  as: 'person'
+});
+
+city.hasMany(address, {
+  foreignKey: 'cityId',
+  as: 'addresses'
+});
+
+address.belongsTo(city, {
+  foreignKey: 'cityId',
+  as: 'city'
+});
+
+province.hasMany(city, {
+  foreignKey: 'provinceId',
+  as: 'cities'
+});
+
+city.belongsTo(province, {
+  foreignKey: 'provinceId',
+  as: 'province'
+});
+
+country.hasMany(province, {
+  foreignKey: 'countryId',
+  as: 'provinces'
+});
+
+province.belongsTo(country, {
+  foreignKey: 'countryId',
+  as: 'country'
+});
+
+force.hasMany(militaryRank, {
+  foreignKey: 'forceId',
+  as: 'militaryRanks'
+});
+
+militaryRank.belongsTo(force, {
+  foreignKey: 'forceId',
+  as: 'force'
+});
+
+militaryRank.hasMany(graduate, {
+  foreignKey: 'militaryRankId',
+  as: 'graduates'
+});
+
+graduate.belongsTo(militaryRank, {
+  foreignKey: 'militaryRankId',
+  as: 'militaryRank'
+});
+
 const models = {
   title,
   faculty,
@@ -190,7 +262,13 @@ const models = {
   person,
   graduate,
   user,
-  contact
+  contact,
+  address,
+  city,
+  province,
+  country,
+  force,
+  militaryRank
 };
 
 type DbModels = typeof models;
@@ -209,7 +287,17 @@ export type {
   RequirementModel,
   RequirementInstanceStatusModel,
   RequestRequirementInstanceModel,
-  RequestTypeRequirementModel
+  RequestTypeRequirementModel,
+  PersonModel,
+  GraduateModel,
+  UserModel,
+  ContactModel,
+  AddressModel,
+  CityModel,
+  ProvinceModel,
+  CountryModel,
+  ForceModel,
+  MilitaryRankModel
 };
 export { sequelize };
 export default models;
