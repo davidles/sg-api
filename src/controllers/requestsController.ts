@@ -2,8 +2,8 @@ import { Request as ExpressRequest, Response } from 'express';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database';
 import models from '../models';
-
-const TITLE_STATUS_IN_PROCESS_ID = 1;
+import { TITLE_STATUS_IN_PROCESS_ID } from '../constants/status';
+import { TITLE_STATUS_PENDING_REQUEST_NAME } from '../constants/status';
 
 const createRequest = async (req: ExpressRequest, res: Response): Promise<void> => {
   const transaction = await sequelize.transaction();
@@ -36,7 +36,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     const requestStatus = await models.requestStatus.findOne({
       where: {
         requestStatusName: {
-          [Op.like]: '%Pending%'
+          [Op.like]: `%${TITLE_STATUS_PENDING_REQUEST_NAME}%`
         }
       },
       transaction

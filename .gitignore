@@ -9,6 +9,7 @@ dist/
 
 schema-inspect.txt
 listTables.js
+insert.sql
 
 # Logs
 npm-debug.log*
