@@ -1,7 +1,7 @@
 import app from './app';
 import { testDatabaseConnection } from './config/database';
 
-const port = process.env.PORT || 4000;
+const port = process.env.APP_PORT || process.env.PORT || 4000;
 
 const bootstrap = async (): Promise<void> => {
   await testDatabaseConnection();
