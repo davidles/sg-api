@@ -1,7 +1,7 @@
 export interface RequestStatusAttributes {
   idRequestStatus: number;
-  idProcessStage: number | null;
-  requestStatusName: string;
+  processStageId: number | null;
+  requestStatusName: string | null;
   requestStatusDescription: string | null;
 }
 

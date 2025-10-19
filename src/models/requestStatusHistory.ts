@@ -17,27 +17,31 @@ export const initRequestStatusHistoryModel = (
     'RequestStatusHistory',
     {
       idRequest: {
+        field: 'idRequest',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         primaryKey: true
       },
       idRequestStatus: {
+        field: 'idRequestStatus',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         primaryKey: true
       },
       statusStartDate: {
+        field: 'statusStartDate',
         type: DataTypes.DATEONLY,
         allowNull: false,
         primaryKey: true
       },
       statusEndDate: {
+        field: 'statusEndDate',
         type: DataTypes.DATEONLY,
         allowNull: true
       }
     },
     {
-      tableName: 'RequestStatusHistory',
+      tableName: 'requeststatushistory',
       timestamps: false,
       freezeTableName: true
     }

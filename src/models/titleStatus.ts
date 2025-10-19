@@ -12,21 +12,24 @@ export const initTitleStatusModel = (sequelize: Sequelize): TitleStatusModel => 
     'TitleStatus',
     {
       idTitleStatus: {
+        field: 'idtituloEstado',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
       titleStatusName: {
-        type: DataTypes.STRING(50),
+        field: 'tituloEstadoNombre',
+        type: DataTypes.STRING(100),
         allowNull: false
       },
       titleStatusDescription: {
-        type: DataTypes.STRING(100),
+        field: 'tituloEstadoDescripcion',
+        type: DataTypes.STRING(255),
         allowNull: true
       }
     },
     {
-      tableName: 'TitleStatus',
+      tableName: 'tituloEstado',
       timestamps: false,
       freezeTableName: true
     }

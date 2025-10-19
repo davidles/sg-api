@@ -12,21 +12,24 @@ export const initRequestTypeModel = (sequelize: Sequelize): RequestTypeModel => 
     'RequestType',
     {
       idRequestType: {
+        field: 'idSolicitudTipo',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
       requestTypeName: {
-        type: DataTypes.STRING(50),
-        allowNull: false
+        field: 'solicitudTipoNombre',
+        type: DataTypes.STRING(255),
+        allowNull: true
       },
       requestTypeDescription: {
-        type: DataTypes.STRING(100),
+        field: 'solicitudTipoDescripcion',
+        type: DataTypes.STRING(255),
         allowNull: true
       }
     },
     {
-      tableName: 'RequestType',
+      tableName: 'solicitud_tipo',
       timestamps: false,
       freezeTableName: true
     }

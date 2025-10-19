@@ -17,22 +17,25 @@ export const initRequirementInstanceStatusModel = (
     'RequirementInstanceStatus',
     {
       idRequirementInstanceStatus: {
+        field: 'idRequirementInstanceStatus',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
       requirementInstanceStatusName: {
-        type: DataTypes.STRING(50),
-        allowNull: false
+        field: 'requirementInstanceStatusName',
+        type: DataTypes.STRING(255),
+        allowNull: true
       },
       requirementInstanceStatusDescription: {
-        type: DataTypes.STRING(100),
+        field: 'requirementInstanceStatusDescription',
+        type: DataTypes.STRING(255),
         allowNull: true
       }
     },
     {
-      tableName: 'RequirementInstanceStatus',
+      tableName: 'requirementinstancestatus',
       timestamps: false,
       freezeTableName: true
     }

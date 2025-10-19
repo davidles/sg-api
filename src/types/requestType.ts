@@ -1,6 +1,6 @@
 export interface RequestTypeAttributes {
   idRequestType: number;
-  requestTypeName: string;
+  requestTypeName: string | null;
   requestTypeDescription: string | null;
 }
 
