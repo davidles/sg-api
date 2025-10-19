@@ -28,6 +28,7 @@ import {
 import { initPersonModel, PersonModel } from './person';
 import { initGraduateModel, GraduateModel } from './graduate';
 import { initUserModel, UserModel } from './user';
+import { initContactModel, ContactModel } from './contact';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
@@ -45,6 +46,7 @@ const requestTypeRequirement = initRequestTypeRequirementModel(sequelize);
 const person = initPersonModel(sequelize);
 const graduate = initGraduateModel(sequelize);
 const user = initUserModel(sequelize);
+const contact = initContactModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -161,6 +163,16 @@ user.belongsTo(person, {
   as: 'person'
 });
 
+person.hasOne(contact, {
+  foreignKey: 'personId',
+  as: 'contact'
+});
+
+contact.belongsTo(person, {
+  foreignKey: 'personId',
+  as: 'person'
+});
+
 const models = {
   title,
   faculty,
@@ -177,7 +189,8 @@ const models = {
   requestTypeRequirement,
   person,
   graduate,
-  user
+  user,
+  contact
 };
 
 type DbModels = typeof models;
