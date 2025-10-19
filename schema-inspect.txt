@@ -1,0 +1,173 @@
+Schema: railway
+Tables found: 35
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tables detail:
+TABLE_NAME
+administrativo
+area
+carrera
+ciudad
+contacto
+direccion
+egresado
+etapaProceso
+facultad
+fuerza_militar
+grado_militar
+modulo
+nacionalidad
+operacion
+pais
+persona
+planEstudio
+provincia
+requestrequirementinstance
+requeststatus
+requeststatushistory
+requirementinstancestatus
+requirementverificationhistory
+requisito
+resultadoVerificacion
+rol
+rol_operacion
+sequelizemeta
+solicitud
+solicitud_tipo
+tipoSolicitudRequisito
+titulo
+tituloEstado
+titulotipo
+usuario
+
+Columns for titulo:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idTitulo|int|NO|PRI|
+tituloIdPlanEstudio|int|YES|MUL|
+tituloNombre|varchar|YES||
+tituloIdTituloTipo|int|YES|MUL|
+tituloIdSolicitudTipo|int|YES|MUL|
+tituloIdTituloEstado|int|YES|MUL|
+
+Columns for tituloEstado:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idtituloEstado|int|NO|PRI|
+tituloEstadoNombre|varchar|NO||
+tituloEstadoDescripcion|varchar|YES||NUll
+
+Columns for solicitud:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idSolicitud|int|NO|PRI|
+solicitudIdUsuario|int|YES|MUL|
+solicitudIdTipoSolicitud|int|YES|MUL|
+solicitudFechaGeneracion|date|YES||
+
+Columns for solicitud_tipo:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idSolicitudTipo|int|NO|PRI|
+solicitudTipoNombre|varchar|YES||
+solicitudTipoDescripcion|varchar|YES||
+
+Columns for tipoSolicitudRequisito:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idTipoSolicitud|int|YES|MUL|
+idRequisito|int|YES|MUL|
+requisitoObligatorio|tinyint|YES||
+
+Columns for egresado:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idEgresado|int|NO|PRI|
+idEgresado_Persona|int|YES|MUL|
+idEgresado_Grado|int|YES|MUL|
+egresadoTipo|enum|YES||
+
+Columns for persona:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idPersona|int|NO|PRI|
+persona_Apellido|varchar|NO||
+persona_Nombre|varchar|NO||
+persona_DNI|varchar|NO||
+persona_Fecha_Nacimiento|date|YES||
+idNacionalidad|int|YES|MUL|
+idCiudadNacimiento|int|YES|MUL|
+
+Columns for planEstudio:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idPlanEstudio|int|NO|PRI|
+planEstudioNombre|varchar|YES||
+planEstudioIdCarrera|int|YES|MUL|
+
+Columns for usuario:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idUsuario|int|NO|PRI|
+idUsuario_Persona|int|YES|MUL|
+usuarioNombre|varchar|NO||
+usuarioCuenta|enum|YES||
+usuarioPasword|varchar|NO||
+usuarioIdRol|int|YES|MUL|
+
+Columns for requestrequirementinstance:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idRequestRequirementInstance|int|NO|PRI|
+idRequest|int|YES|MUL|
+idRequirement|int|YES|MUL|
+idCompletedByUser|int|YES|MUL|
+completedAt|date|YES||
+idVerifiedByUser|int|YES|MUL|
+verifiedAt|date|YES||
+idCurrentRequirementStatus|int|YES|MUL|
+complianceVersion|int|YES||
+reviewReason|longtext|YES||
+
+Columns for requeststatus:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idRequestStatus|int|NO|PRI|
+idProcessStage|int|YES|MUL|
+requestStatusName|varchar|YES||
+requestStatusDescription|varchar|YES||
+
+Columns for requeststatushistory:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idRequest|int|NO|PRI|
+idRequestStatus|int|NO|PRI|
+statusStartDate|date|NO|PRI|
+statusEndDate|date|YES||
+
+Columns for requirementinstancestatus:
+COLUMN_NAME|DATA_TYPE|IS_NULLABLE|COLUMN_KEY|COLUMN_DEFAULT
+idRequirementInstanceStatus|int|NO|PRI|
+requirementInstanceStatusName|varchar|YES||
+requirementInstanceStatusDescription|varchar|YES||
