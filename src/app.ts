@@ -4,6 +4,7 @@ import requestsRouter from './routes/requests';
 import titlesRouter from './routes/titles';
 import formsRouter from './routes/forms';
 import usersRouter from './routes/users';
+import authRouter from './routes/auth';
 
 const app = express();
 
@@ -35,5 +36,6 @@ app.use('/api/requests', requestsRouter);
 app.use('/api/titles', titlesRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/auth', authRouter);
 
 export default app;
