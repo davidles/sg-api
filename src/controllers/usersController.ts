@@ -11,7 +11,30 @@ const listUsers = async (req: Request, res: Response): Promise<void> => {
       order: [['idUser', 'ASC']]
     });
 
-    const serializedUsers = users.map(serializeUser);
+    const serializedUsers = users.map((user) => {
+      const person = user.get('person') as Record<string, unknown> | null;
+      const contact = user.get('contact') as Record<string, unknown> | null;
+
+      return {
+        id: user.getDataValue('idUser'),
+        username: user.getDataValue('username'),
+        accountType: user.getDataValue('accountType'),
+        roleId: user.getDataValue('roleId'),
+        person: person
+          ? {
+              firstName: (person.firstName as string | null) ?? null,
+              lastName: (person.lastName as string | null) ?? null,
+              documentNumber: (person.documentNumber as string | null) ?? null
+            }
+          : null,
+        contact: contact
+          ? {
+              emailAddress: (contact.emailAddress as string | null) ?? null,
+              mobilePhone: (contact.mobilePhone as string | null) ?? null
+            }
+          : null
+      };
+    });
 
     res.json(serializedUsers);
   } catch (error) {
