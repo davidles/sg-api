@@ -2,9 +2,9 @@ export interface UserAttributes {
   idUser: number;
   personId: number | null;
   username: string;
-  accountType: string | null;
+  accountType: 'ACTIVA' | 'INACTIVA';
   password: string;
-  roleId: number | null;
+  roleId: number;
 }
 
 export type UserCreationAttributes = Omit<UserAttributes, 'idUser'>;

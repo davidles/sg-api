@@ -106,17 +106,17 @@ request.belongsTo(requestType, {
 });
 
 requestStatusHistory.belongsTo(request, {
-  foreignKey: 'idRequest',
+  foreignKey: 'requestId',
   as: 'request'
 });
 
 requestStatusHistory.belongsTo(requestStatus, {
-  foreignKey: 'idRequestStatus',
+  foreignKey: 'requestStatusId',
   as: 'status'
 });
 
 request.hasMany(requestStatusHistory, {
-  foreignKey: 'idRequest',
+  foreignKey: 'requestId',
   as: 'statusHistory'
 });
 

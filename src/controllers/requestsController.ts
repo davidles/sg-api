@@ -100,8 +100,8 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     await models.requestStatusHistory.create(
       {
-        idRequest: createdRequest.getDataValue('idRequest'),
-        idRequestStatus: requestStatus.getDataValue('idRequestStatus'),
+        requestId: createdRequest.getDataValue('idRequest'),
+        requestStatusId: requestStatus.getDataValue('idRequestStatus'),
         statusStartDate: generatedAt,
         statusEndDate: null
       },
