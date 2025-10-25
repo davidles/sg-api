@@ -11,10 +11,12 @@ const EMAIL_REGEX = /^[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+$/i;
 const PASSWORD_MIN_LENGTH = 8;
 const SALT_ROUNDS = 12;
 
+type UserAccountType = 'ACTIVA' | 'INACTIVA';
+
 type CredentialsPayload = {
   username: string;
   password: string;
-  accountType?: string | null;
+  accountType?: UserAccountType | null;
   roleId?: number | null;
 };
 
@@ -118,7 +120,12 @@ export const USER_DEFAULT_INCLUDE = [
 ];
 
 const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
-  credentials: CredentialsPayload & { username: string };
+  credentials: {
+    username: string;
+    password: string;
+    accountType: UserAccountType;
+    roleId: number;
+  };
   person: PersonPayload & { nationalityId: number | null; birthCityId: number | null };
   contact: ContactPayload;
   address: AddressPayload;
@@ -206,21 +213,27 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
 
   const rawAccountType =
     typeof payload.credentials?.accountType === 'string'
-      ? payload.credentials.accountType.trim()
+      ? payload.credentials.accountType.trim().toUpperCase()
       : null;
 
-  const accountType = rawAccountType && rawAccountType.length > 0 ? rawAccountType : null;
+  let accountType: UserAccountType = 'ACTIVA';
 
-  if (accountType && accountType.length > 50) {
-    throw new AppError('El tipo de cuenta no puede superar los 50 caracteres', 400);
+  if (rawAccountType) {
+    if (rawAccountType !== 'ACTIVA' && rawAccountType !== 'INACTIVA') {
+      throw new AppError('El estado de la cuenta debe ser ACTIVA o INACTIVA', 400);
+    }
+
+    accountType = rawAccountType;
   }
+
+  const roleId = ensureNumber(payload.credentials?.roleId, 'El rol');
 
   return {
     credentials: {
       username: normalizedUsername,
       password,
       accountType,
-      roleId: payload.credentials?.roleId ?? null
+      roleId
     },
     person: {
       firstName,
@@ -324,7 +337,7 @@ export const registerUser = async (
         username: normalizedPayload.credentials.username,
         password: passwordHash,
         accountType: normalizedPayload.credentials.accountType,
-        roleId: normalizedPayload.credentials.roleId ?? null,
+        roleId: normalizedPayload.credentials.roleId,
         personId
       },
       { transaction }
