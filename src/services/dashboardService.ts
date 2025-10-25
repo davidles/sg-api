@@ -113,9 +113,12 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
     throw new AppError('Usuario no encontrado', 404);
   }
 
-  const [requestTypes, requests] = await Promise.all([
-    models.requestType.findAll({ order: [['requestTypeName', 'ASC']] }),
-    models.request.findAll({
+  const requestTypes = await models.requestType.findAll({ order: [['requestTypeName', 'ASC']] });
+
+  let requests: RequestInstance[] = [];
+
+  try {
+    requests = await models.request.findAll({
       where: { userId },
       include: [
         { model: models.requestType, as: 'requestType' },
@@ -126,8 +129,18 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
         }
       ],
       order: [['generatedAt', 'DESC']]
-    })
-  ]);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('requeststatushistory')) {
+      requests = await models.request.findAll({
+        where: { userId },
+        include: [{ model: models.requestType, as: 'requestType' }],
+        order: [['generatedAt', 'DESC']]
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const menuOptions = requestTypes.map(mapMenuOption);
   const requestSummaries = requests.map(mapRequestSummary);
