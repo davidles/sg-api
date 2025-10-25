@@ -5,6 +5,7 @@ import titlesRouter from './routes/titles';
 import formsRouter from './routes/forms';
 import usersRouter from './routes/users';
 import authRouter from './routes/auth';
+import dashboardRouter from './routes/dashboard';
 
 const app = express();
 
@@ -37,5 +38,6 @@ app.use('/api/titles', titlesRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 export default app;

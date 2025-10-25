@@ -129,6 +129,7 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
   }
 
   const username = ensureString(payload.credentials?.username, 'El usuario');
+  const normalizedUsername = username.toLowerCase();
   const password = ensureString(payload.credentials?.password, 'La contraseña');
 
   if (password.length < PASSWORD_MIN_LENGTH) {
@@ -216,7 +217,7 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
 
   return {
     credentials: {
-      username,
+      username: normalizedUsername,
       password,
       accountType,
       roleId: payload.credentials?.roleId ?? null
@@ -345,10 +346,11 @@ export const registerUser = async (
 
 export const authenticateUser = async (payload: LoginPayload): Promise<AuthResponse> => {
   const username = ensureString(payload?.username, 'El usuario');
+  const normalizedUsername = username.toLowerCase();
   const password = ensureString(payload?.password, 'La contraseña');
 
   const userInstance = await models.user.findOne({
-    where: { username },
+    where: { username: normalizedUsername },
     include: USER_DEFAULT_INCLUDE
   });
 
