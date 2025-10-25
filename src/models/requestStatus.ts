@@ -17,30 +17,25 @@ export const initRequestStatusModel = (
     'RequestStatus',
     {
       idRequestStatus: {
-        field: 'idRequestStatus',
+        field: 'idSolicitudEstado',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
-      processStageId: {
-        field: 'idProcessStage',
-        type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true
-      },
       requestStatusName: {
-        field: 'requestStatusName',
+        field: 'solicitudEstado_Nombre',
         type: DataTypes.STRING(100),
         allowNull: true
       },
       requestStatusDescription: {
-        field: 'requestStatusDescription',
+        field: 'soliciutdEstado_Descripcion',
         type: DataTypes.STRING(255),
         allowNull: true
       }
     },
     {
-      tableName: 'requeststatus',
+      tableName: 'solicitudEstado',
       timestamps: false,
       freezeTableName: true
     }

@@ -9,6 +9,7 @@ export interface RequestRequirementInstanceAttributes {
   currentRequirementStatusId: number | null;
   complianceVersion: number | null;
   reviewReason: string | null;
+  requirementFilePath: string | null;
 }
 
 export type RequestRequirementInstanceCreationAttributes = Omit<

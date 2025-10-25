@@ -67,6 +67,11 @@ export const initRequestRequirementInstanceModel = (
         field: 'reviewReason',
         type: DataTypes.TEXT('long'),
         allowNull: true
+      },
+      requirementFilePath: {
+        field: 'requirementFilePath',
+        type: DataTypes.STRING(255),
+        allowNull: true
       }
     },
     {
