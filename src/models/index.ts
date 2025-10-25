@@ -35,6 +35,10 @@ import { initProvinceModel, ProvinceModel } from './province';
 import { initCountryModel, CountryModel } from './country';
 import { initForceModel, ForceModel } from './force';
 import { initMilitaryRankModel, MilitaryRankModel } from './militaryRank';
+import {
+  initPasswordResetTokenModel,
+  PasswordResetTokenModel
+} from './passwordResetToken';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
@@ -59,6 +63,7 @@ const province = initProvinceModel(sequelize);
 const country = initCountryModel(sequelize);
 const force = initForceModel(sequelize);
 const militaryRank = initMilitaryRankModel(sequelize);
+const passwordResetToken = initPasswordResetTokenModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -245,6 +250,16 @@ graduate.belongsTo(militaryRank, {
   as: 'militaryRank'
 });
 
+user.hasMany(passwordResetToken, {
+  foreignKey: 'userId',
+  as: 'passwordResetTokens'
+});
+
+passwordResetToken.belongsTo(user, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
 const models = {
   title,
   faculty,
@@ -269,6 +284,7 @@ const models = {
   country,
   force,
   militaryRank
+  , passwordResetToken
 };
 
 type DbModels = typeof models;
@@ -298,6 +314,7 @@ export type {
   CountryModel,
   ForceModel,
   MilitaryRankModel
+  , PasswordResetTokenModel
 };
 export { sequelize };
 export default models;
