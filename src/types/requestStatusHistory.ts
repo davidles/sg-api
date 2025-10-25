@@ -1,6 +1,6 @@
 export interface RequestStatusHistoryAttributes {
-  idRequest: number;
-  idRequestStatus: number;
+  requestId: number;
+  requestStatusId: number;
   statusStartDate: string;
   statusEndDate: string | null;
 }
