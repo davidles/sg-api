@@ -22,12 +22,19 @@ export const initUserModel = (sequelize: Sequelize): UserModel => {
       username: {
         field: 'usuarioNombre',
         type: DataTypes.STRING(255),
-        allowNull: false
+        allowNull: false,
+        validate: {
+          isEmail: true
+        }
       },
       accountType: {
         field: 'usuarioCuenta',
-        type: DataTypes.STRING(50),
-        allowNull: true
+        type: DataTypes.STRING(10),
+        allowNull: false,
+        defaultValue: 'ACTIVA',
+        validate: {
+          isIn: [['ACTIVA', 'INACTIVA']]
+        }
       },
       password: {
         field: 'usuarioPasword',
@@ -37,7 +44,7 @@ export const initUserModel = (sequelize: Sequelize): UserModel => {
       roleId: {
         field: 'usuarioIdRol',
         type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: true
+        allowNull: false
       }
     },
     {
