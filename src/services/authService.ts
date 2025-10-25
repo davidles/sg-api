@@ -38,6 +38,7 @@ type AddressPayload = {
   street: string;
   streetNumber: number;
   cityId: number;
+  provinceId: number;
 };
 
 type GraduatePayload = {
@@ -159,6 +160,7 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
   const street = ensureString(payload.address?.street, 'La calle');
   const streetNumber = ensureNumber(payload.address?.streetNumber, 'El número de calle');
   const cityId = ensureNumber(payload.address?.cityId, 'La ciudad');
+  const provinceId = ensureNumber(payload.address?.provinceId, 'La provincia');
 
   const birthDate = typeof payload.person?.birthDate === 'string'
     ? payload.person.birthDate
@@ -193,6 +195,15 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
 
   if (!existingCity) {
     throw new AppError('La ciudad seleccionada no existe', 400);
+  }
+
+  const existingProvince = await models.province.findByPk(provinceId);
+  if (!existingProvince) {
+    throw new AppError('La provincia seleccionada no existe', 400);
+  }
+
+  if (existingCity.getDataValue('provinceId') !== existingProvince.getDataValue('idProvince')) {
+    throw new AppError('La ciudad seleccionada no pertenece a la provincia indicada', 400);
   }
 
   if (birthCityId !== null) {
@@ -250,7 +261,8 @@ const validateRegisterPayload = async (payload: RegisterUserPayload): Promise<{
     address: {
       street,
       streetNumber,
-      cityId
+      cityId,
+      provinceId
     },
     graduate: {
       graduateType,
