@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { Op } from 'sequelize';
 
 import models from '../models';
+import { sendResetPasswordEmail } from '../utils/mailer';
 import { AppError } from '../utils/appError';
 
 const TOKEN_BYTES = 32;
@@ -37,6 +38,16 @@ export const createResetToken = async (identifier: unknown): Promise<{ resetUrl:
 
   const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
   const resetUrl = `${frontendUrl}/auth/reset-password?token=${token}`;
+
+  // Try to send email to the username (stored as email)
+  const to = user.getDataValue('username');
+  if (to && typeof to === 'string' && to.includes('@')) {
+    try {
+      await sendResetPasswordEmail(to, resetUrl);
+    } catch (err) {
+      // Do not fail the flow if email sending has issues
+    }
+  }
 
   return { resetUrl };
 };
