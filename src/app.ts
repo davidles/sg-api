@@ -7,6 +7,7 @@ import usersRouter from './routes/users';
 import authRouter from './routes/auth';
 import dashboardRouter from './routes/dashboard';
 import locationsRouter from './routes/locations';
+import militaryRouter from './routes/military';
 
 const app = express();
 
@@ -41,5 +42,6 @@ app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/locations', locationsRouter);
+app.use('/api/military', militaryRouter);
 
 export default app;
