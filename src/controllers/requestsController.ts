@@ -9,9 +9,9 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
   const transaction = await sequelize.transaction();
 
   try {
-    const { idUser, idTitle, idRequestType } = req.body;
+    const { idUser: userId, idTitle, idRequestType } = req.body;
 
-    if (!idTitle || !idRequestType || !idUser) {
+    if (!idTitle || !idRequestType || !userId) {
       await transaction.rollback();
       res.status(400).json({ message: 'idTitle, idRequestType y idUser son obligatorios' });
       return;
@@ -69,7 +69,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const createdRequest = await models.request.create(
       {
-        userId: idUser,
+        userId,
         requestTypeId: idRequestType,
         generatedAt
       },
