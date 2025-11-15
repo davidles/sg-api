@@ -2,8 +2,11 @@ import { Request as ExpressRequest, Response } from 'express';
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database';
 import models from '../models';
-import { TITLE_STATUS_IN_PROCESS_ID } from '../constants/status';
-import { TITLE_STATUS_PENDING_REQUEST_NAME } from '../constants/status';
+import {
+  TITLE_STATUS_IN_PROCESS_ID,
+  TITLE_STATUS_PENDING_REQUEST_NAME,
+  REQUIREMENT_STATUS_INITIAL_NAME
+} from '../constants/status';
 
 const createRequest = async (req: ExpressRequest, res: Response): Promise<void> => {
   const transaction = await sequelize.transaction();
@@ -35,9 +38,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const requestStatus = await models.requestStatus.findOne({
       where: {
-        requestStatusName: {
-          [Op.like]: `%${TITLE_STATUS_PENDING_REQUEST_NAME}%`
-        }
+        requestStatusName: TITLE_STATUS_PENDING_REQUEST_NAME
       },
       transaction
     });
@@ -50,9 +51,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const requirementInstanceStatus = await models.requirementInstanceStatus.findOne({
       where: {
-        requirementInstanceStatusName: {
-          [Op.like]: '%Pending%'
-        }
+        requirementInstanceStatusName: REQUIREMENT_STATUS_INITIAL_NAME
       },
       transaction
     });
@@ -92,7 +91,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
           currentRequirementStatusId: requirementInstanceStatus.getDataValue(
             'idRequirementInstanceStatus'
           ),
-          complianceVersion: 1
+          completionVersion: 1
         })),
         { transaction }
       );
@@ -121,7 +120,10 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     res.status(201).json({
       idRequest: createdRequest.getDataValue('idRequest'),
       generatedAt,
-      currentStatus: requestStatus.getDataValue('requestStatusName')
+      currentStatus: requestStatus.getDataValue('requestStatusName'),
+      requirements: requestRequirements.map((requirement) => ({
+        requirementId: requirement.getDataValue('requirementId')
+      }))
     });
   } catch (error) {
     await transaction.rollback();
