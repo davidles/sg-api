@@ -12,21 +12,24 @@ export const initAcademicProgramModel = (sequelize: Sequelize): AcademicProgramM
     'AcademicProgram',
     {
       idAcademicProgram: {
+        field: 'idCarrera',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
       academicProgramName: {
+        field: 'carreraNombre',
         type: DataTypes.STRING(100),
         allowNull: false
       },
       idFaculty: {
+        field: 'carreraIdFacultad',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       }
     },
     {
-      tableName: 'AcademicProgram',
+      tableName: 'carrera',
       timestamps: false,
       freezeTableName: true
     }

@@ -35,6 +35,7 @@ import { initProvinceModel, ProvinceModel } from './province';
 import { initCountryModel, CountryModel } from './country';
 import { initForceModel, ForceModel } from './force';
 import { initMilitaryRankModel, MilitaryRankModel } from './militaryRank';
+import { initEnrollmentModel, EnrollmentModel } from './enrollment';
 
 const title = initTitleModel(sequelize);
 const faculty = initFacultyModel(sequelize);
@@ -59,6 +60,7 @@ const province = initProvinceModel(sequelize);
 const country = initCountryModel(sequelize);
 const force = initForceModel(sequelize);
 const militaryRank = initMilitaryRankModel(sequelize);
+const enrollment = initEnrollmentModel(sequelize);
 
 faculty.hasMany(academicProgram, {
   foreignKey: 'idFaculty',
@@ -75,8 +77,18 @@ academicProgram.hasMany(studyPlan, {
   as: 'studyPlans'
 });
 
+academicProgram.hasMany(enrollment, {
+  foreignKey: 'academicProgramId',
+  as: 'enrollments'
+});
+
 studyPlan.belongsTo(academicProgram, {
   foreignKey: 'careerId',
+  as: 'academicProgram'
+});
+
+enrollment.belongsTo(academicProgram, {
+  foreignKey: 'academicProgramId',
   as: 'academicProgram'
 });
 
@@ -163,6 +175,16 @@ person.hasOne(graduate, {
 graduate.belongsTo(person, {
   foreignKey: 'personId',
   as: 'person'
+});
+
+graduate.hasMany(enrollment, {
+  foreignKey: 'graduateId',
+  as: 'enrollments'
+});
+
+enrollment.belongsTo(graduate, {
+  foreignKey: 'graduateId',
+  as: 'graduate'
 });
 
 person.hasOne(user, {
@@ -268,7 +290,8 @@ const models = {
   province,
   country,
   force,
-  militaryRank
+  militaryRank,
+  enrollment
 };
 
 type DbModels = typeof models;
@@ -297,7 +320,8 @@ export type {
   ProvinceModel,
   CountryModel,
   ForceModel,
-  MilitaryRankModel
+  MilitaryRankModel,
+  EnrollmentModel
 };
 export { sequelize };
 export default models;

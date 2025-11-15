@@ -9,17 +9,19 @@ export const initFacultyModel = (sequelize: Sequelize): FacultyModel => {
     'Faculty',
     {
       idFaculty: {
+        field: 'idFacultad',
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
         autoIncrement: true
       },
       facultyName: {
+        field: 'facultadNombre',
         type: DataTypes.STRING(100),
-        allowNull: false
+        allowNull: true
       }
     },
     {
-      tableName: 'Faculty',
+      tableName: 'facultad',
       timestamps: false,
       freezeTableName: true
     }
