@@ -8,7 +8,10 @@ import type { RequestTypeInstance } from '../models/requestType';
 import type { PersonInstance } from '../models/person';
 import type { GraduateInstance } from '../models/graduate';
 import type { EnrollmentInstance } from '../models/enrollment';
-import { TITLE_STATUS_PENDING_REQUEST_NAME } from '../constants/status';
+import {
+  REQUEST_STATUS_PENDING_NAME,
+  TITLE_STATUS_PENDING_REQUEST_ID
+} from '../constants/status';
 
 export type AvailableTitle = {
   idTitle: number;
@@ -70,21 +73,9 @@ export const findAvailableTitlesForUser = async (userId: number): Promise<Availa
     return [];
   }
 
-  const pendingStatus = await models.titleStatus.findOne({
-    where: {
-      titleStatusName: {
-        [Op.like]: `%${TITLE_STATUS_PENDING_REQUEST_NAME}%`
-      }
-    }
-  });
-
-  if (!pendingStatus) {
-    return [];
-  }
-
   const titles = await models.title.findAll({
     where: {
-      titleStatusId: pendingStatus.getDataValue('idTitleStatus')
+      titleStatusId: TITLE_STATUS_PENDING_REQUEST_ID
     },
     include: [
       {

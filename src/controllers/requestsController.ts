@@ -1,10 +1,11 @@
 import { Request as ExpressRequest, Response } from 'express';
-import { Op } from 'sequelize';
 import { sequelize } from '../config/database';
 import models from '../models';
+import type { TitleStatusInstance } from '../models/titleStatus';
 import {
   TITLE_STATUS_IN_PROCESS_ID,
-  TITLE_STATUS_PENDING_REQUEST_NAME,
+  TITLE_STATUS_PENDING_REQUEST_ID,
+  REQUEST_STATUS_PENDING_NAME,
   REQUIREMENT_STATUS_INITIAL_NAME
 } from '../constants/status';
 
@@ -20,11 +21,27 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
       return;
     }
 
-    const title = await models.title.findByPk(idTitle, { transaction });
+    const title = await models.title.findByPk(idTitle, {
+      transaction,
+      include: [
+        { model: models.titleStatus, as: 'titleStatus' },
+        { model: models.requestType, as: 'requestType' }
+      ]
+    });
 
     if (!title) {
       await transaction.rollback();
       res.status(404).json({ message: 'El título especificado no existe' });
+      return;
+    }
+
+    const titleStatusInstance = title.get('titleStatus') as TitleStatusInstance | null;
+    if (
+      titleStatusInstance &&
+      titleStatusInstance.getDataValue('idTitleStatus') !== TITLE_STATUS_PENDING_REQUEST_ID
+    ) {
+      await transaction.rollback();
+      res.status(409).json({ message: 'El título seleccionado no está disponible para solicitar' });
       return;
     }
 
@@ -36,9 +53,30 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
       return;
     }
 
+    const titleAssignedRequestTypeId = title.getDataValue('requestTypeId');
+    if (titleAssignedRequestTypeId && titleAssignedRequestTypeId !== idRequestType) {
+      await transaction.rollback();
+      res.status(400).json({ message: 'El título seleccionado no corresponde al tipo de solicitud indicado' });
+      return;
+    }
+
+    const existingRequest = await models.request.findOne({
+      where: {
+        userId: idUser,
+        titleId: idTitle
+      },
+      transaction
+    });
+
+    if (existingRequest) {
+      await transaction.rollback();
+      res.status(409).json({ message: 'Ya existe una solicitud para este título y usuario' });
+      return;
+    }
+
     const requestStatus = await models.requestStatus.findOne({
       where: {
-        requestStatusName: TITLE_STATUS_PENDING_REQUEST_NAME
+        requestStatusName: REQUEST_STATUS_PENDING_NAME
       },
       transaction
     });
@@ -70,6 +108,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
       {
         userId: idUser,
         requestTypeId: idRequestType,
+        titleId: idTitle,
         generatedAt
       },
       { transaction }
@@ -118,12 +157,23 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     await transaction.commit();
 
     res.status(201).json({
-      idRequest: createdRequest.getDataValue('idRequest'),
-      generatedAt,
-      currentStatus: requestStatus.getDataValue('requestStatusName'),
-      requirements: requestRequirements.map((requirement) => ({
-        requirementId: requirement.getDataValue('requirementId')
-      }))
+      data: {
+        idRequest: createdRequest.getDataValue('idRequest'),
+        generatedAt,
+        currentStatus: requestStatus.getDataValue('requestStatusName'),
+        requestType: {
+          idRequestType: requestType.getDataValue('idRequestType'),
+          requestTypeName: requestType.getDataValue('requestTypeName')
+        },
+        title: {
+          idTitle: title.getDataValue('idTitle'),
+          titleName: title.getDataValue('titleName')
+        },
+        requirements: requestRequirements.map((requirement) => ({
+          requirementId: requirement.getDataValue('requirementId'),
+          isRequired: requirement.getDataValue('isRequired') === 1
+        }))
+      }
     });
   } catch (error) {
     await transaction.rollback();
