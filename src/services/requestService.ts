@@ -13,7 +13,6 @@ import {
   TITLE_STATUS_PENDING_REQUEST_ID
 } from '../constants/status';
 
-
 export type AvailableTitle = {
   idTitle: number;
   studyPlanId: number | null;
