@@ -17,54 +17,54 @@ export const initRequestRequirementInstanceModel = (
     'RequestRequirementInstance',
     {
       idRequestRequirementInstance: {
-        field: 'idRequestRequirementInstance',
+        field: 'idSolicitudRequisitoInstancia',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         autoIncrement: true,
         primaryKey: true
       },
       requestId: {
-        field: 'idRequest',
+        field: 'instanciaIdSolicitud',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       requirementId: {
-        field: 'idRequirement',
+        field: 'instanciaIdRequisito',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       completedByUserId: {
-        field: 'idCompletedByUser',
+        field: 'instanciaIdUsuarioCompletador',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       completedAt: {
-        field: 'completedAt',
+        field: 'fechaCompletado',
         type: DataTypes.DATEONLY,
         allowNull: true
       },
       verifiedByUserId: {
-        field: 'idVerifiedByUser',
+        field: 'instanciaIdUsuarioVerificador',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       verifiedAt: {
-        field: 'verifiedAt',
+        field: 'fechaVerificacion',
         type: DataTypes.DATEONLY,
         allowNull: true
       },
       currentRequirementStatusId: {
-        field: 'idCurrentRequirementStatus',
+        field: 'idRequisitoInstancia_EstadoActual',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
-      complianceVersion: {
-        field: 'complianceVersion',
+      completionVersion: {
+        field: 'VersionCompletada',
         type: DataTypes.INTEGER,
         allowNull: true
       },
       reviewReason: {
-        field: 'reviewReason',
+        field: 'MotivoRevision',
         type: DataTypes.TEXT('long'),
         allowNull: true
       },
@@ -72,10 +72,15 @@ export const initRequestRequirementInstanceModel = (
         field: 'requirementFilePath',
         type: DataTypes.STRING(255),
         allowNull: true
+      },
+      fileBlob: {
+        field: 'archivo',
+        type: DataTypes.BLOB,
+        allowNull: true
       }
     },
     {
-      tableName: 'requestrequirementinstance',
+      tableName: 'solicitudRequisitoInstancia',
       timestamps: false,
       freezeTableName: true
     }
