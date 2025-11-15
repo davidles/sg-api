@@ -117,6 +117,11 @@ request.belongsTo(requestType, {
   as: 'requestType'
 });
 
+request.belongsTo(title, {
+  foreignKey: 'titleId',
+  as: 'title'
+});
+
 requestStatusHistory.belongsTo(request, {
   foreignKey: 'requestId',
   as: 'request'
