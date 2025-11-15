@@ -7,6 +7,7 @@ import type { TitleStatusInstance } from '../models/titleStatus';
 import type { RequestTypeInstance } from '../models/requestType';
 import type { PersonInstance } from '../models/person';
 import type { GraduateInstance } from '../models/graduate';
+import type { EnrollmentInstance } from '../models/enrollment';
 import { TITLE_STATUS_PENDING_REQUEST_NAME } from '../constants/status';
 
 export type AvailableTitle = {
@@ -48,6 +49,27 @@ export const findAvailableTitlesForUser = async (userId: number): Promise<Availa
     return [];
   }
 
+  const graduateId = graduateInstance.getDataValue('idGraduate');
+
+  if (!graduateId) {
+    return [];
+  }
+
+  const enrollmentInstances = (await models.enrollment.findAll({
+    where: {
+      graduateId
+    },
+    attributes: ['academicProgramId']
+  })) as EnrollmentInstance[];
+
+  const academicProgramIds = enrollmentInstances
+    .map((enrollment) => enrollment.getDataValue('academicProgramId'))
+    .filter((programId): programId is number => programId !== null && programId !== undefined);
+
+  if (!academicProgramIds.length) {
+    return [];
+  }
+
   const pendingStatus = await models.titleStatus.findOne({
     where: {
       titleStatusName: {
@@ -68,10 +90,17 @@ export const findAvailableTitlesForUser = async (userId: number): Promise<Availa
       {
         model: models.studyPlan,
         as: 'studyPlan',
+        required: true,
         include: [
           {
             model: models.academicProgram,
             as: 'academicProgram',
+            required: true,
+            where: {
+              idAcademicProgram: {
+                [Op.in]: academicProgramIds
+              }
+            },
             include: [{ model: models.faculty, as: 'faculty' }]
           }
         ]
@@ -99,7 +128,7 @@ export const findAvailableTitlesForUser = async (userId: number): Promise<Availa
       planName: plan?.getDataValue('studyPlanName') ?? null,
       academicProgramName: academicProgram?.getDataValue('academicProgramName') ?? null,
       facultyName: faculty?.getDataValue('facultyName') ?? null,
-      requestTypeId: title.getDataValue('requestTypeId') ?? null,
+      requestTypeId: requestType?.getDataValue('idRequestType') ?? title.getDataValue('requestTypeId') ?? null,
       requestTypeName: requestType?.getDataValue('requestTypeName') ?? null,
       statusName: status?.getDataValue('titleStatusName') ?? null
     };

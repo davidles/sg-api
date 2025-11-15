@@ -14,6 +14,8 @@ if (existsSync(envPath)) {
   dotenv.config();
 }
 
+const isTest = process.env.NODE_ENV === 'test';
+
 const mysqlUrl = process.env.MYSQL_URL || process.env.MYSQL_PUBLIC_URL;
 
 let urlHost: string | undefined;
@@ -39,18 +41,29 @@ if (mysqlUrl) {
   }
 }
 
-const dbHost = process.env.DB_HOST || process.env.MYSQL_HOST || urlHost || 'localhost';
-const dbPort = Number(process.env.DB_PORT || process.env.MYSQL_PORT || urlPort || 3306);
-const dbName = process.env.DB_NAME || process.env.MYSQL_DATABASE || urlDatabase || 'secretary-portal';
-const dbUser = process.env.DB_USER || process.env.MYSQL_USER || urlUser || 'root';
-const dbPassword = process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || process.env.MYSQL_ROOT_PASSWORD || urlPassword || '';
+let sequelize: Sequelize;
 
-export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
-  host: dbHost,
-  port: dbPort,
-  dialect: 'mysql',
-  logging: false
-});
+if (isTest) {
+  sequelize = new Sequelize('sqlite::memory:', {
+    logging: false
+  });
+} else {
+  const dbHost = process.env.DB_HOST || process.env.MYSQL_HOST || urlHost || 'localhost';
+  const dbPort = Number(process.env.DB_PORT || process.env.MYSQL_PORT || urlPort || 3306);
+  const dbName = process.env.DB_NAME || process.env.MYSQL_DATABASE || urlDatabase || 'secretary-portal';
+  const dbUser = process.env.DB_USER || process.env.MYSQL_USER || urlUser || 'root';
+  const dbPassword =
+    process.env.DB_PASSWORD || process.env.MYSQL_PASSWORD || process.env.MYSQL_ROOT_PASSWORD || urlPassword || '';
+
+  sequelize = new Sequelize(dbName, dbUser, dbPassword, {
+    host: dbHost,
+    port: dbPort,
+    dialect: 'mysql',
+    logging: false
+  });
+}
+
+export { sequelize };
 
 export const testDatabaseConnection = async (): Promise<void> => {
   try {
