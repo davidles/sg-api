@@ -7,9 +7,10 @@ export interface RequestRequirementInstanceAttributes {
   verifiedByUserId: number | null;
   verifiedAt: string | null;
   currentRequirementStatusId: number | null;
-  complianceVersion: number | null;
+  completionVersion: number | null;
   reviewReason: string | null;
   requirementFilePath: string | null;
+  fileBlob: Buffer | null;
 }
 
 export type RequestRequirementInstanceCreationAttributes = Omit<

@@ -27,4 +27,4 @@ Thumbs.db
 # Database
 secretary-portal.sql
 responseDB
-
+context/*

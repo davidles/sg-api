@@ -17,7 +17,7 @@ export const initRequestTypeRequirementModel = (
     'RequestTypeRequirement',
     {
       requestTypeId: {
-        field: 'idTipoSolicitud',
+        field: 'idSolicitudTipo',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
         primaryKey: true

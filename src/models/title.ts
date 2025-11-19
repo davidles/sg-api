@@ -15,7 +15,7 @@ export const initTitleModel = (sequelize: Sequelize): TitleModel => {
         autoIncrement: true
       },
       studyPlanId: {
-        field: 'tituloIdPlanEstudio',
+        field: 'FKidTituloPlanEstudio',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
@@ -25,17 +25,17 @@ export const initTitleModel = (sequelize: Sequelize): TitleModel => {
         allowNull: true
       },
       titleTypeId: {
-        field: 'tituloIdTituloTipo',
+        field: 'FKidTituloTipo',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       requestTypeId: {
-        field: 'tituloIdSolicitudTipo',
+        field: 'FKidTituloSolicitudTipo',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       titleStatusId: {
-        field: 'tituloIdTituloEstado',
+        field: 'FKidTituloEstado',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       }

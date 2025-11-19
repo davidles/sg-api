@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
     "lint": "echo \"No lint configured\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "author": "",
@@ -27,16 +28,20 @@
     "sequelize": "^6.37.7"
   },
   "devDependencies": {
+    "sqlite3": "^5.1.7",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^1.4.13",
     "@types/node": "^24.7.1",
     "@types/nodemailer": "^7.0.3",
     "@types/pdfkit": "^0.13.5",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.10",
     "sequelize-cli": "^6.6.3",
+    "ts-jest": "^29.2.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

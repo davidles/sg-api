@@ -33,7 +33,7 @@ export const initUserModel = (sequelize: Sequelize): UserModel => {
         allowNull: false,
         defaultValue: 'ACTIVA',
         validate: {
-          isIn: [['ACTIVA', 'INACTIVA']]
+          isIn: [['ACTIVA', 'INACTIVA', 'PENDIENTE']]
         }
       },
       password: {

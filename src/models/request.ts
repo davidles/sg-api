@@ -25,6 +25,11 @@ export const initRequestModel = (sequelize: Sequelize): RequestModel => {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
+      titleId: {
+        field: 'solicitudIdTitulo',
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true
+      },
       generatedAt: {
         field: 'solicitudFechaGeneracion',
         type: DataTypes.DATEONLY,

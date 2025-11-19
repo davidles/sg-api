@@ -1,13 +1,27 @@
 import { Op } from 'sequelize';
 import models from '../models';
 import type { StudyPlanInstance } from '../models/studyPlan';
+import type { AcademicProgramInstance } from '../models/academicProgram';
+import type { FacultyInstance } from '../models/faculty';
 import type { TitleStatusInstance } from '../models/titleStatus';
-import { TITLE_STATUS_PENDING_REQUEST_NAME } from '../constants/status';
+import type { RequestTypeInstance } from '../models/requestType';
+import type { PersonInstance } from '../models/person';
+import type { GraduateInstance } from '../models/graduate';
+import type { EnrollmentInstance } from '../models/enrollment';
+import {
+  REQUEST_STATUS_PENDING_NAME,
+  TITLE_STATUS_PENDING_REQUEST_ID
+} from '../constants/status';
 
 export type AvailableTitle = {
   idTitle: number;
+  studyPlanId: number | null;
   titleName: string | null;
   planName: string | null;
+  academicProgramName: string | null;
+  facultyName: string | null;
+  requestTypeId: number | null;
+  requestTypeName: string | null;
   statusName: string | null;
 };
 
@@ -26,43 +40,87 @@ export const findAvailableTitlesForUser = async (userId: number): Promise<Availa
     throw new Error('Usuario no encontrado');
   }
 
-  const person = user.get('person') as Record<string, unknown> | null;
-  const graduate = person?.graduate as Record<string, unknown> | undefined;
+  const personInstance = user.get('person') as PersonInstance | null;
 
-  if (!graduate) {
+  if (!personInstance) {
+    throw new Error('El usuario no tiene datos personales asociados');
+  }
+
+  const graduateInstance = personInstance.get('graduate') as GraduateInstance | null;
+
+  if (!graduateInstance) {
     return [];
   }
 
-  const pendingStatus = await models.titleStatus.findOne({
-    where: {
-      titleStatusName: {
-        [Op.like]: `%${TITLE_STATUS_PENDING_REQUEST_NAME}%`
-      }
-    }
-  });
+  const graduateId = graduateInstance.getDataValue('idGraduate');
 
-  if (!pendingStatus) {
+  if (!graduateId) {
+    return [];
+  }
+
+  const enrollmentInstances = (await models.enrollment.findAll({
+    where: {
+      graduateId
+    },
+    attributes: ['academicProgramId']
+  })) as EnrollmentInstance[];
+
+  const academicProgramIds = enrollmentInstances
+    .map((enrollment) => enrollment.getDataValue('academicProgramId'))
+    .filter((programId): programId is number => programId !== null && programId !== undefined);
+
+  if (!academicProgramIds.length) {
     return [];
   }
 
   const titles = await models.title.findAll({
     where: {
-      titleStatusId: pendingStatus.getDataValue('idTitleStatus')
+      titleStatusId: TITLE_STATUS_PENDING_REQUEST_ID
     },
     include: [
-      { model: models.studyPlan, as: 'studyPlan' },
-      { model: models.titleStatus, as: 'titleStatus' }
+      {
+        model: models.studyPlan,
+        as: 'studyPlan',
+        required: true,
+        include: [
+          {
+            model: models.academicProgram,
+            as: 'academicProgram',
+            required: true,
+            where: {
+              idAcademicProgram: {
+                [Op.in]: academicProgramIds
+              }
+            },
+            include: [{ model: models.faculty, as: 'faculty' }]
+          }
+        ]
+      },
+      { model: models.titleStatus, as: 'titleStatus' },
+      { model: models.requestType, as: 'requestType' }
     ]
   });
 
   return titles.map((title) => {
     const plan = title.get('studyPlan') as StudyPlanInstance | undefined;
+    const academicProgram = plan
+      ? (plan.get('academicProgram') as AcademicProgramInstance | null)
+      : null;
+    const faculty = academicProgram
+      ? (academicProgram.get('faculty') as FacultyInstance | null)
+      : null;
     const status = title.get('titleStatus') as TitleStatusInstance | undefined;
+    const requestType = title.get('requestType') as RequestTypeInstance | undefined;
 
     return {
       idTitle: title.getDataValue('idTitle'),
+      studyPlanId: title.getDataValue('studyPlanId') ?? null,
       titleName: title.getDataValue('titleName'),
       planName: plan?.getDataValue('studyPlanName') ?? null,
+      academicProgramName: academicProgram?.getDataValue('academicProgramName') ?? null,
+      facultyName: faculty?.getDataValue('facultyName') ?? null,
+      requestTypeId: requestType?.getDataValue('idRequestType') ?? title.getDataValue('requestTypeId') ?? null,
+      requestTypeName: requestType?.getDataValue('requestTypeName') ?? null,
       statusName: status?.getDataValue('titleStatusName') ?? null
     };
   });

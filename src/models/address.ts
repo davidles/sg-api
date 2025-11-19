@@ -25,12 +25,12 @@ export const initAddressModel = (sequelize: Sequelize): AddressModel => {
         allowNull: true
       },
       cityId: {
-        field: 'idCiudad',
+        field: 'direccionIdCiudad',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       },
       personId: {
-        field: 'idPersona',
+        field: 'direccionIdPersona',
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true
       }

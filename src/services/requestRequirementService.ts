@@ -46,10 +46,11 @@ export const getRequirementsForRequest = async (
     order: [['idRequestRequirementInstance', 'ASC']]
   });
 
-  const normalizedFilters = statusFilters
-    ?.map((value) => value.trim())
-    .filter((value) => value.length > 0)
-    .map((value) => value.toLowerCase()) ?? [];
+  const normalizedFilters =
+    statusFilters
+      ?.map((value) => value.trim())
+      .filter((value) => value.length > 0)
+      .map((value) => value.toLowerCase()) ?? [];
 
   const filteredInstances =
     normalizedFilters.length > 0
@@ -177,16 +178,26 @@ export const uploadRequirementFileForRequest = async (
 
   ensureDirectory(path.dirname(absoluteUploadedPath));
 
-  const complianceVersion = (instance.getDataValue('complianceVersion') ?? 0) + 1;
+  let fileBuffer: Buffer | null = null;
+
+  try {
+    fileBuffer = fs.readFileSync(absoluteUploadedPath);
+  } catch (error) {
+    fileBuffer = null;
+  }
+
+  const previousVersion = instance.getDataValue('completionVersion');
+  const completionVersion = (typeof previousVersion === 'number' ? previousVersion : 0) + 1;
   const storageDate = new Date().toISOString().split('T')[0];
 
   await instance.update({
     completedByUserId: userId,
     completedAt: storageDate,
     currentRequirementStatusId: statusToApply ?? instance.getDataValue('currentRequirementStatusId'),
-    complianceVersion,
+    completionVersion,
     reviewReason: reviewReason ?? instance.getDataValue('reviewReason'),
-    requirementFilePath: normalizeStoredPath(absoluteUploadedPath)
+    requirementFilePath: normalizeStoredPath(absoluteUploadedPath),
+    fileBlob: fileBuffer
   });
 
   await instance.reload({

@@ -3,6 +3,10 @@ import type { RequestTypeInstance } from '../models/requestType';
 import type { RequestInstance } from '../models/request';
 import type { RequestStatusHistoryInstance } from '../models/requestStatusHistory';
 import type { RequestStatusInstance } from '../models/requestStatus';
+import type { TitleInstance } from '../models/title';
+import type { StudyPlanInstance } from '../models/studyPlan';
+import type { AcademicProgramInstance } from '../models/academicProgram';
+import type { FacultyInstance } from '../models/faculty';
 import { AppError } from '../utils/appError';
 import type {
   DashboardData,
@@ -91,6 +95,10 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
   const mappedStatusHistory = (instance.get('statusHistory') as RequestStatusHistoryInstance[] | undefined) ?? [];
   const statusInfo = resolveLatestStatus(mappedStatusHistory);
   const requestType = instance.get('requestType') as RequestTypeInstance | null;
+  const title = instance.get('title') as TitleInstance | null;
+  const studyPlan = title?.get('studyPlan') as StudyPlanInstance | null;
+  const academicProgram = studyPlan?.get('academicProgram') as AcademicProgramInstance | null;
+  const faculty = academicProgram?.get('faculty') as FacultyInstance | null;
 
   return {
     idRequest: instance.getDataValue('idRequest'),
@@ -98,7 +106,11 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
     generatedAt: instance.getDataValue('generatedAt') ?? null,
     statusName: statusInfo.statusName,
     statusDescription: statusInfo.statusDescription,
-    nextAction: computeNextAction(statusInfo.statusName)
+    nextAction: computeNextAction(statusInfo.statusName),
+    requestTypeId: requestType?.getDataValue('idRequestType') ?? instance.getDataValue('requestTypeId') ?? null,
+    academicProgramName: academicProgram?.getDataValue('academicProgramName') ?? null,
+    facultyName: faculty?.getDataValue('facultyName') ?? null,
+    planName: studyPlan?.getDataValue('studyPlanName') ?? null
   };
 };
 
@@ -123,6 +135,23 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
       include: [
         { model: models.requestType, as: 'requestType' },
         {
+          model: models.title,
+          as: 'title',
+          include: [
+            {
+              model: models.studyPlan,
+              as: 'studyPlan',
+              include: [
+                {
+                  model: models.academicProgram,
+                  as: 'academicProgram',
+                  include: [{ model: models.faculty, as: 'faculty' }]
+                }
+              ]
+            }
+          ]
+        },
+        {
           model: models.requestStatusHistory,
           as: 'statusHistory',
           include: [{ model: models.requestStatus, as: 'status' }]
@@ -134,7 +163,26 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
     if (error instanceof Error && error.message.includes('requeststatushistory')) {
       requests = await models.request.findAll({
         where: { userId },
-        include: [{ model: models.requestType, as: 'requestType' }],
+        include: [
+          { model: models.requestType, as: 'requestType' },
+          {
+            model: models.title,
+            as: 'title',
+            include: [
+              {
+                model: models.studyPlan,
+                as: 'studyPlan',
+                include: [
+                  {
+                    model: models.academicProgram,
+                    as: 'academicProgram',
+                    include: [{ model: models.faculty, as: 'faculty' }]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
         order: [['generatedAt', 'DESC']]
       });
     } else {
