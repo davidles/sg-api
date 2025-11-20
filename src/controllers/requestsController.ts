@@ -9,19 +9,31 @@ import {
   REQUIREMENT_STATUS_INITIAL_NAME
 } from '../constants/status';
 
+type CreateRequestPayload = {
+  idUser?: number | string;
+  idTitle?: number | string;
+  idRequestType?: number | string;
+};
+
 const createRequest = async (req: ExpressRequest, res: Response): Promise<void> => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { idUser: userId, idTitle, idRequestType } = req.body;
+    const { idUser, idTitle, idRequestType } = req.body as CreateRequestPayload;
 
-    if (!idTitle || !idRequestType || !userId) {
+    const parsedIdUser = Number(idUser);
+    const parsedIdTitle = Number(idTitle);
+    const parsedIdRequestType = Number(idRequestType);
+
+    const isValidInteger = (value: number): boolean => Number.isInteger(value) && value > 0;
+
+    if (!isValidInteger(parsedIdTitle) || !isValidInteger(parsedIdRequestType) || !isValidInteger(parsedIdUser)) {
       await transaction.rollback();
       res.status(400).json({ message: 'idTitle, idRequestType y idUser son obligatorios' });
       return;
     }
 
-    const title = await models.title.findByPk(idTitle, {
+    const title = await models.title.findByPk(parsedIdTitle, {
       transaction,
       include: [
         { model: models.titleStatus, as: 'titleStatus' },
@@ -45,7 +57,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
       return;
     }
 
-    const requestType = await models.requestType.findByPk(idRequestType, { transaction });
+    const requestType = await models.requestType.findByPk(parsedIdRequestType, { transaction });
 
     if (!requestType) {
       await transaction.rollback();
@@ -54,7 +66,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     }
 
     const titleAssignedRequestTypeId = title.getDataValue('requestTypeId');
-    if (titleAssignedRequestTypeId && titleAssignedRequestTypeId !== idRequestType) {
+    if (titleAssignedRequestTypeId && titleAssignedRequestTypeId !== parsedIdRequestType) {
       await transaction.rollback();
       res.status(400).json({ message: 'El título seleccionado no corresponde al tipo de solicitud indicado' });
       return;
@@ -62,8 +74,8 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const existingRequest = await models.request.findOne({
       where: {
-        userId: idUser,
-        titleId: idTitle
+        userId: parsedIdUser,
+        titleId: parsedIdTitle
       },
       transaction
     });
@@ -106,9 +118,9 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const createdRequest = await models.request.create(
       {
-        userId,
-        requestTypeId: idRequestType,
-        titleId: idTitle,
+        userId: parsedIdUser,
+        requestTypeId: parsedIdRequestType,
+        titleId: parsedIdTitle,
         generatedAt
       },
       { transaction }
@@ -116,7 +128,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
 
     const requestRequirements = await models.requestTypeRequirement.findAll({
       where: {
-        requestTypeId: idRequestType,
+        requestTypeId: parsedIdRequestType,
         isRequired: 1
       },
       transaction
@@ -149,7 +161,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
     await models.title.update(
       { titleStatusId: TITLE_STATUS_IN_PROCESS_ID },
       {
-        where: { idTitle },
+        where: { idTitle: parsedIdTitle },
         transaction
       }
     );
