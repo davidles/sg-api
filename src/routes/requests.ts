@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { createRequest } from '../controllers/requestsController';
 import {
   getRequestRequirements,
-  uploadRequestRequirementFile
+  uploadRequestRequirementFile,
+  downloadRequestRequirementFile
 } from '../controllers/requestRequirementsController';
 import { uploadMiddleware } from '../middleware/upload';
 
@@ -15,5 +16,6 @@ router.post(
   uploadMiddleware.single('file'),
   uploadRequestRequirementFile
 );
+router.get('/:requestId/requirements/:requirementInstanceId/file', downloadRequestRequirementFile);
 
 export default router;

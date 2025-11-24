@@ -1,6 +1,8 @@
 import models from '../models';
 import type { RequestTypeInstance } from '../models/requestType';
 import type { RequestInstance } from '../models/request';
+import type { RequestRequirementInstanceInstance } from '../models/requestRequirementInstance';
+import type { RequirementInstanceStatusInstance } from '../models/requirementInstanceStatus';
 import type { RequestStatusHistoryInstance } from '../models/requestStatusHistory';
 import type { RequestStatusInstance } from '../models/requestStatus';
 import type { TitleInstance } from '../models/title';
@@ -13,6 +15,7 @@ import type {
   DashboardMenuOption,
   DashboardRequestSummary
 } from '../types/dashboard';
+import { REQUIREMENT_STATUS_COMPLETED_ID } from '../constants/status';
 
 const mapMenuOption = (instance: RequestTypeInstance): DashboardMenuOption => {
   const plain = instance.get({ plain: true });
@@ -99,6 +102,20 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
   const studyPlan = title?.get('studyPlan') as StudyPlanInstance | null;
   const academicProgram = studyPlan?.get('academicProgram') as AcademicProgramInstance | null;
   const faculty = academicProgram?.get('faculty') as FacultyInstance | null;
+  const requirementInstances =
+    (instance.get('requirementInstances') as RequestRequirementInstanceInstance[] | undefined) ?? [];
+
+  const totalRequirements = requirementInstances.length;
+  const completedRequirements = requirementInstances.filter((requirementInstance) => {
+    const statusId = requirementInstance.getDataValue('currentRequirementStatusId');
+
+    if (typeof statusId === 'number') {
+      return statusId === REQUIREMENT_STATUS_COMPLETED_ID;
+    }
+
+    const statusInstance = requirementInstance.get('status') as RequirementInstanceStatusInstance | null;
+    return statusInstance?.getDataValue('idRequirementInstanceStatus') === REQUIREMENT_STATUS_COMPLETED_ID;
+  }).length;
 
   return {
     idRequest: instance.getDataValue('idRequest'),
@@ -110,7 +127,9 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
     requestTypeId: requestType?.getDataValue('idRequestType') ?? instance.getDataValue('requestTypeId') ?? null,
     academicProgramName: academicProgram?.getDataValue('academicProgramName') ?? null,
     facultyName: faculty?.getDataValue('facultyName') ?? null,
-    planName: studyPlan?.getDataValue('studyPlanName') ?? null
+    planName: studyPlan?.getDataValue('studyPlanName') ?? null,
+    totalRequirements,
+    completedRequirements
   };
 };
 
@@ -155,6 +174,11 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
           model: models.requestStatusHistory,
           as: 'statusHistory',
           include: [{ model: models.requestStatus, as: 'status' }]
+        },
+        {
+          model: models.requestRequirementInstance,
+          as: 'requirementInstances',
+          include: [{ model: models.requirementInstanceStatus, as: 'status' }]
         }
       ],
       order: [['generatedAt', 'DESC']]
