@@ -1,10 +1,28 @@
 import fs from 'fs';
 import path from 'path';
+import { Op, Transaction } from 'sequelize';
+import { sequelize } from '../config/database';
 import models from '../models';
 import type { RequestRequirementInstanceAttributes } from '../types/requestRequirementInstance';
 import type { RequirementAttributes } from '../types/requirement';
 import type { RequirementInstanceStatusAttributes } from '../types/requirementInstanceStatus';
 import type { RequestRequirementInstanceInstance } from '../models/requestRequirementInstance';
+import {
+  REQUIREMENT_STATUS_COMPLETED_ID,
+  REQUIREMENT_STATUS_COMPLETED_NAME,
+  REQUEST_STATUS_IN_FACULTY_NAME,
+  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES
+} from '../constants/status';
+
+const ALLOWED_REQUIREMENT_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
+const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png'
+};
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 export interface RequestRequirementItem {
   requirementInstance: RequestRequirementInstanceAttributes;
@@ -101,6 +119,34 @@ const mapToItem = (instance: RequestRequirementInstanceInstance): RequestRequire
   };
 };
 
+const validateUploadedFile = (filePath: string): { absolutePath: string; extension: string; mimeType: string } => {
+  const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);
+
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error('El archivo temporal no existe. Intentá nuevamente la carga.');
+  }
+
+  const fileStats = fs.statSync(absolutePath);
+
+  if (fileStats.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error('El archivo supera el tamaño máximo permitido (10 MB).');
+  }
+
+  const extension = path.extname(absolutePath).toLowerCase();
+
+  if (!ALLOWED_REQUIREMENT_EXTENSIONS.has(extension)) {
+    throw new Error('El formato de archivo no es válido. Permitidos: PDF, JPG, JPEG, PNG.');
+  }
+
+  const mimeType = MIME_TYPES_BY_EXTENSION[extension];
+
+  if (!mimeType) {
+    throw new Error('No se pudo determinar el tipo de archivo.');
+  }
+
+  return { absolutePath, extension, mimeType };
+};
+
 export const uploadRequirementFileForRequest = async (
   requestId: number,
   requirementInstanceId: number,
@@ -156,64 +202,248 @@ export const uploadRequirementFileForRequest = async (
     statusToApply = status.getDataValue('idRequirementInstanceStatus');
   }
 
-  const previousFilePath = instance.getDataValue('requirementFilePath');
+  await sequelize.transaction(async (transaction) => {
+    const previousFilePath = instance.getDataValue('requirementFilePath');
 
-  if (previousFilePath) {
-    const absolutePrevious = path.isAbsolute(previousFilePath)
-      ? previousFilePath
-      : path.resolve(process.cwd(), previousFilePath);
+    if (previousFilePath) {
+      const absolutePrevious = path.isAbsolute(previousFilePath)
+        ? previousFilePath
+        : path.resolve(process.cwd(), previousFilePath);
+
+      try {
+        if (fs.existsSync(absolutePrevious)) {
+          fs.unlinkSync(absolutePrevious);
+        }
+      } catch (error) {
+        // Ignorar errores al eliminar archivos antiguos para no bloquear la carga.
+      }
+    }
+
+    const { absolutePath: absoluteUploadedPath } = validateUploadedFile(uploadedFilePath);
+
+    ensureDirectory(path.dirname(absoluteUploadedPath));
+
+    let fileBuffer: Buffer | null = null;
 
     try {
-      if (fs.existsSync(absolutePrevious)) {
-        fs.unlinkSync(absolutePrevious);
-      }
+      fileBuffer = fs.readFileSync(absoluteUploadedPath);
     } catch (error) {
-      // Ignorar errores al eliminar archivos antiguos para no bloquear la carga.
+      fileBuffer = null;
     }
-  }
 
-  const absoluteUploadedPath = path.isAbsolute(uploadedFilePath)
-    ? uploadedFilePath
-    : path.resolve(process.cwd(), uploadedFilePath);
+    const previousVersion = instance.getDataValue('completionVersion');
+    const completionVersion = (typeof previousVersion === 'number' ? previousVersion : 0) + 1;
+    const storageDate = new Date().toISOString();
 
-  ensureDirectory(path.dirname(absoluteUploadedPath));
+    const statusIdToPersist =
+      typeof statusToApply === 'number' ? statusToApply : REQUIREMENT_STATUS_COMPLETED_ID;
 
-  let fileBuffer: Buffer | null = null;
-
-  try {
-    fileBuffer = fs.readFileSync(absoluteUploadedPath);
-  } catch (error) {
-    fileBuffer = null;
-  }
-
-  const previousVersion = instance.getDataValue('completionVersion');
-  const completionVersion = (typeof previousVersion === 'number' ? previousVersion : 0) + 1;
-  const storageDate = new Date().toISOString().split('T')[0];
-
-  await instance.update({
-    completedByUserId: userId,
-    completedAt: storageDate,
-    currentRequirementStatusId: statusToApply ?? instance.getDataValue('currentRequirementStatusId'),
-    completionVersion,
-    reviewReason: reviewReason ?? instance.getDataValue('reviewReason'),
-    requirementFilePath: normalizeStoredPath(absoluteUploadedPath),
-    fileBlob: fileBuffer
-  });
-
-  await instance.reload({
-    include: [
+    await instance.update(
       {
-        model: models.requirement,
-        as: 'requirement',
-        attributes: ['idRequirement', 'requirementName', 'requirementDescription']
+        completedByUserId: userId,
+        completedAt: storageDate,
+        currentRequirementStatusId: statusIdToPersist,
+        completionVersion,
+        reviewReason: reviewReason ?? instance.getDataValue('reviewReason'),
+        requirementFilePath: normalizeStoredPath(absoluteUploadedPath),
+        fileBlob: fileBuffer
       },
-      {
-        model: models.requirementInstanceStatus,
-        as: 'status',
-        attributes: ['idRequirementInstanceStatus', 'requirementInstanceStatusName']
-      }
-    ]
+      { transaction }
+    );
+
+    await instance.reload({
+      include: [
+        {
+          model: models.requirement,
+          as: 'requirement',
+          attributes: ['idRequirement', 'requirementName', 'requirementDescription']
+        },
+        {
+          model: models.requirementInstanceStatus,
+          as: 'status',
+          attributes: ['idRequirementInstanceStatus', 'requirementInstanceStatusName']
+        }
+      ],
+      transaction
+    });
+
+    await promoteRequestStatusIfRequirementsCompleted(instance.getDataValue('requestId'), transaction);
   });
 
   return mapToItem(instance);
+};
+
+const promoteRequestStatusIfRequirementsCompleted = async (
+  requestId: number | null | undefined,
+  transaction?: Transaction
+): Promise<void> => {
+  if (!Number.isInteger(requestId) || (requestId as number) <= 0) {
+    return;
+  }
+
+  const parsedRequestId = Number(requestId);
+
+  const transactionToUse = transaction ?? (await sequelize.transaction());
+  const shouldManageTransaction = !transaction;
+
+  const pendingRequirements = await models.requestRequirementInstance.count({
+    where: {
+      requestId: parsedRequestId,
+      [Op.or]: [
+        { currentRequirementStatusId: null },
+        {
+          currentRequirementStatusId: {
+            [Op.ne]: REQUIREMENT_STATUS_COMPLETED_ID
+          }
+        }
+      ]
+    },
+    transaction: transactionToUse
+  });
+
+  if (pendingRequirements > 0) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    return;
+  }
+
+  const statusCandidates = [REQUEST_STATUS_IN_FACULTY_NAME, ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES];
+
+  const targetStatus = await models.requestStatus.findOne({
+    where: {
+      requestStatusName: {
+        [Op.in]: statusCandidates
+      }
+    },
+    transaction: transactionToUse
+  });
+
+  if (!targetStatus) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw new Error(
+      `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_FACULTY_NAME}". Verificá la configuración de datos.`
+    );
+  }
+
+  try {
+    const latestHistory = await models.requestStatusHistory.findOne({
+      where: {
+        requestId: parsedRequestId
+      },
+      order: [['statusStartDate', 'DESC']],
+      transaction: transactionToUse
+    });
+
+    const targetStatusId = targetStatus.getDataValue('idRequestStatus');
+    const nowIso = new Date().toISOString();
+
+    if (latestHistory) {
+      const latestStatusId = latestHistory.getDataValue('requestStatusId');
+      const hasOpenHistory = !latestHistory.getDataValue('statusEndDate');
+
+      if (latestStatusId === targetStatusId) {
+        if (shouldManageTransaction) {
+          await transactionToUse.rollback();
+        }
+        return;
+      }
+
+      if (hasOpenHistory) {
+        await latestHistory.update(
+          {
+            statusEndDate: nowIso
+          },
+          { transaction: transactionToUse }
+        );
+      }
+    }
+
+    await models.requestStatusHistory.create(
+      {
+        requestId: parsedRequestId,
+        requestStatusId: targetStatusId,
+        statusStartDate: nowIso,
+        statusEndDate: null
+      },
+      { transaction: transactionToUse }
+    );
+
+    if (shouldManageTransaction) {
+      await transactionToUse.commit();
+    }
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw error;
+  }
+};
+
+export interface RequirementFilePayload {
+  fileName: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+export const getRequirementFileForRequest = async (
+  requestId: number,
+  requirementInstanceId: number
+): Promise<RequirementFilePayload> => {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    throw new Error('requestId debe ser un número positivo');
+  }
+
+  if (!Number.isInteger(requirementInstanceId) || requirementInstanceId <= 0) {
+    throw new Error('requirementInstanceId debe ser un número positivo');
+  }
+
+  const instance = await models.requestRequirementInstance.findOne({
+    where: {
+      idRequestRequirementInstance: requirementInstanceId,
+      requestId
+    }
+  });
+
+  if (!instance) {
+    throw new Error('No se encontró el requisito para la solicitud indicada');
+  }
+
+  const storedPath = instance.getDataValue('requirementFilePath');
+  const storedBuffer = instance.getDataValue('fileBlob') as Buffer | null;
+
+  if (!storedPath && !storedBuffer) {
+    throw new Error('La instancia del requisito no tiene un archivo cargado todavía.');
+  }
+
+  let buffer: Buffer;
+  let fileName = `requisito_${requirementInstanceId}`;
+  let mimeType = 'application/octet-stream';
+
+  if (storedBuffer && storedBuffer.length > 0) {
+    buffer = storedBuffer;
+  } else if (storedPath) {
+    const absolutePath = path.isAbsolute(storedPath)
+      ? storedPath
+      : path.resolve(process.cwd(), storedPath);
+
+    if (!fs.existsSync(absolutePath)) {
+      throw new Error('El archivo asociado al requisito no está disponible.');
+    }
+
+    buffer = fs.readFileSync(absolutePath);
+    const extension = path.extname(absolutePath).toLowerCase();
+    mimeType = MIME_TYPES_BY_EXTENSION[extension] ?? mimeType;
+    fileName = path.basename(absolutePath);
+  } else {
+    throw new Error('No se pudo recuperar el archivo del requisito.');
+  }
+
+  return {
+    fileName,
+    mimeType,
+    buffer
+  };
 };

@@ -6,7 +6,7 @@ import {
   TITLE_STATUS_IN_PROCESS_ID,
   TITLE_STATUS_PENDING_REQUEST_ID,
   REQUEST_STATUS_PENDING_NAME,
-  REQUIREMENT_STATUS_INITIAL_NAME
+  REQUIREMENT_STATUS_INITIAL_ID
 } from '../constants/status';
 
 type CreateRequestPayload = {
@@ -99,21 +99,6 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
       return;
     }
 
-    const requirementInstanceStatus = await models.requirementInstanceStatus.findOne({
-      where: {
-        requirementInstanceStatusName: REQUIREMENT_STATUS_INITIAL_NAME
-      },
-      transaction
-    });
-
-    if (!requirementInstanceStatus) {
-      await transaction.rollback();
-      res
-        .status(500)
-        .json({ message: 'No se encontró el estado inicial para los requisitos' });
-      return;
-    }
-
     const generatedAt = new Date().toISOString().split('T')[0];
 
     const createdRequest = await models.request.create(
@@ -139,9 +124,7 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
         requestRequirements.map((requirement) => ({
           requestId: createdRequest.getDataValue('idRequest'),
           requirementId: requirement.getDataValue('requirementId'),
-          currentRequirementStatusId: requirementInstanceStatus.getDataValue(
-            'idRequirementInstanceStatus'
-          ),
+          currentRequirementStatusId: REQUIREMENT_STATUS_INITIAL_ID,
           completionVersion: 1
         })),
         { transaction }

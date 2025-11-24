@@ -1,4 +1,9 @@
 export const TITLE_STATUS_PENDING_REQUEST_ID = 1;
 export const TITLE_STATUS_IN_PROCESS_ID = 2;
 export const REQUEST_STATUS_PENDING_NAME = 'Pendiente';
+export const REQUEST_STATUS_IN_FACULTY_NAME = 'En proceso Facultad';
+export const REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES = ['En trámite'];
 export const REQUIREMENT_STATUS_INITIAL_NAME = 'Incompleto';
+export const REQUIREMENT_STATUS_INITIAL_ID = 1;
+export const REQUIREMENT_STATUS_COMPLETED_NAME = 'Completo';
+export const REQUIREMENT_STATUS_COMPLETED_ID = 2;
