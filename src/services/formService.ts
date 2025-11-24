@@ -53,6 +53,9 @@ export type FormData = {
   catalogs: {
     forces: ForceAttributes[];
     militaryRanks: MilitaryRankAttributes[];
+    countries: CountryAttributes[];
+    provinces: ProvinceAttributes[];
+    cities: CityAttributes[];
   };
 };
 
@@ -166,7 +169,14 @@ const validateUpdatePayload = async (payload: UpdateFormPayload): Promise<void> 
 };
 
 export const getFormDataForUser = async (userId: number): Promise<FormData> => {
-  const [user, forceInstances, militaryRankInstances] = await Promise.all([
+  const [
+    user,
+    forceInstances,
+    militaryRankInstances,
+    countryInstances,
+    provinceInstances,
+    cityInstances
+  ] = await Promise.all([
     models.user.findByPk(userId, {
       include: [
         {
@@ -207,7 +217,10 @@ export const getFormDataForUser = async (userId: number): Promise<FormData> => {
       ]
     }),
     models.force.findAll(),
-    models.militaryRank.findAll()
+    models.militaryRank.findAll(),
+    models.country.findAll(),
+    models.province.findAll(),
+    models.city.findAll()
   ]);
 
   if (!user) {
@@ -271,6 +284,15 @@ export const getFormDataForUser = async (userId: number): Promise<FormData> => {
   const militaryRanks = militaryRankInstances.map((instance) =>
     instance.get({ plain: true }) as MilitaryRankAttributes
   );
+  const countries = countryInstances.map((instance) =>
+    instance.get({ plain: true }) as CountryAttributes
+  );
+  const provinces = provinceInstances.map((instance) =>
+    instance.get({ plain: true }) as ProvinceAttributes
+  );
+  const cities = cityInstances.map((instance) =>
+    instance.get({ plain: true }) as CityAttributes
+  );
 
   return {
     person: {
@@ -310,7 +332,10 @@ export const getFormDataForUser = async (userId: number): Promise<FormData> => {
       : null,
     catalogs: {
       forces,
-      militaryRanks
+      militaryRanks,
+      countries,
+      provinces,
+      cities
     }
   };
 };

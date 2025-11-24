@@ -1,93 +1,189 @@
-import PDFDocument from 'pdfkit';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { getFormDataForUser } from './formService';
+const PAGE_WIDTH = 595; // A4 width in points
+const PAGE_HEIGHT = 842; // A4 height in points
+const MARGIN_X = 60;
+const MARGIN_Y = 60;
+const DEFAULT_LINE_HEIGHT = 12;
+const DOTTED_SEGMENT_WIDTH = 3;
+const DOTTED_SEGMENT_GAP = 3;
+const SIGNATURE_BLOCK_WIDTH = 200;
+const SIGNATURE_LINE_PATTERN_WIDTH = 4;
+const SIGNATURE_LINE_PATTERN_GAP = 3;
+const HYPHEN_SEPARATOR_FONT_SIZE = 9;
 
-const formatValue = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) {
-    return '-';
+const drawDottedLine = (
+  page: import('pdf-lib').PDFPage,
+  startX: number,
+  endX: number,
+  y: number,
+  segmentWidth = DOTTED_SEGMENT_WIDTH,
+  gap = DOTTED_SEGMENT_GAP
+) => {
+  for (let x = startX; x < endX; x += segmentWidth + gap) {
+    const effectiveEndX = Math.min(x + segmentWidth, endX);
+    page.drawLine({
+      start: { x, y },
+      end: { x: effectiveEndX, y },
+      thickness: 0.6,
+      color: rgb(0.4, 0.4, 0.4)
+    });
   }
+};
 
-  if (typeof value === 'string' && value.trim() === '') {
-    return '-';
+const drawSignatureBlock = (
+  page: import('pdf-lib').PDFPage,
+  {
+    x,
+    width,
+    label,
+    name,
+    font,
+    boldFont,
+    lineY,
+    nameY,
+    labelY
+  }: {
+    x: number;
+    width: number;
+    label: string;
+    name: string;
+    font: import('pdf-lib').PDFFont;
+    boldFont: import('pdf-lib').PDFFont;
+    lineY: number;
+    nameY: number;
+    labelY: number;
   }
+) => {
+  const nameWidth = font.widthOfTextAtSize(name, 11);
+  const labelWidth = font.widthOfTextAtSize(label, 8);
+  const centerX = x + width / 2;
 
-  return String(value);
+  drawDottedLine(page, x, x + width, lineY, SIGNATURE_LINE_PATTERN_WIDTH, SIGNATURE_LINE_PATTERN_GAP);
+
+  page.drawText(name, {
+    x: centerX - nameWidth / 2,
+    y: nameY,
+    size: 11,
+    font,
+    color: rgb(0, 0, 0)
+  });
+
+  page.drawText(label, {
+    x: centerX - labelWidth / 2,
+    y: labelY,
+    size: 8,
+    font,
+    color: rgb(0.2, 0.2, 0.2)
+  });
+};
+
+const drawHyphenSeparator = (
+  page: import('pdf-lib').PDFPage,
+  font: import('pdf-lib').PDFFont,
+  y: number
+) => {
+  const usableWidth = PAGE_WIDTH - MARGIN_X * 2;
+  const hyphenWidth = font.widthOfTextAtSize('-', HYPHEN_SEPARATOR_FONT_SIZE);
+  const hyphenCount = Math.ceil(usableWidth / hyphenWidth) + 2;
+  const hyphenLine = '-'.repeat(hyphenCount);
+
+  page.drawText(hyphenLine, {
+    x: MARGIN_X,
+    y,
+    size: HYPHEN_SEPARATOR_FONT_SIZE,
+    font,
+    color: rgb(0.45, 0.45, 0.45)
+  });
 };
 
 export const createFormPdf = async (userId: number): Promise<Buffer> => {
   const formData = await getFormDataForUser(userId);
-  const document = new PDFDocument({ margin: 50 });
-  const chunks: Buffer[] = [];
 
-  return await new Promise<Buffer>((resolve, reject) => {
-    document.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
 
-    document.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
+  const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    document.on('error', (error) => {
-      reject(error);
-    });
+  const fullName = [formData.person.lastName, formData.person.firstName]
+    .map((value) => value?.trim() ?? '')
+    .filter(Boolean)
+    .join(' ');
 
-    document.fontSize(18).text('Formulario de expedición de título', {
-      align: 'center'
-    });
+  const nameToRender = fullName.length ? fullName : '---';
+  const uppercaseName = nameToRender === '---' ? '---' : nameToRender.toUpperCase();
 
-    document.moveDown();
+  // Header block
+  const headerTitleY = PAGE_HEIGHT - 100;
+  const headerText = 'Por Dios, la Patria y el Honor';
+  const headerTextSize = 10;
+  const headerTextWidth = helveticaBoldFont.widthOfTextAtSize(headerText, headerTextSize);
 
-    document.fontSize(14).text('Datos Personales', { underline: true });
-    document.moveDown(0.5);
-    document.fontSize(12);
-    document.text(`Apellido: ${formatValue(formData.person.lastName)}`);
-    document.text(`Nombre: ${formatValue(formData.person.firstName)}`);
-    document.text(`Documento: ${formatValue(formData.person.documentNumber)}`);
-    document.text(`Fecha de nacimiento: ${formatValue(formData.person.birthDate)}`);
-    document.text(`Nacionalidad: ${formatValue(formData.person.nationalityId)}`);
-    document.text(`Ciudad de nacimiento: ${formatValue(formData.person.birthCityId)}`);
-
-    document.moveDown();
-
-    document.fontSize(14).text('Datos de Contacto', { underline: true });
-    document.moveDown(0.5);
-    document.fontSize(12);
-    document.text(
-      `Teléfono celular: ${formatValue(formData.contact?.mobilePhone ?? null)}`
-    );
-    document.text(`Correo electrónico: ${formatValue(formData.contact?.emailAddress ?? null)}`);
-
-    document.moveDown();
-
-    document.fontSize(14).text('Datos de Domicilio', { underline: true });
-    document.moveDown(0.5);
-    document.fontSize(12);
-    const street = formData.address?.street ?? null;
-    const streetNumber = formData.address?.streetNumber ?? null;
-    const city = formData.address?.city?.cityName ?? null;
-    const province = formData.address?.province?.provinceName ?? null;
-    const country = formData.address?.country?.countryName ?? null;
-    document.text(`Calle: ${formatValue(street)}`);
-    document.text(`Número: ${formatValue(streetNumber)}`);
-    document.text(`Ciudad: ${formatValue(city)}`);
-    document.text(`Provincia: ${formatValue(province)}`);
-    document.text(`País: ${formatValue(country)}`);
-
-    document.moveDown();
-
-    document.fontSize(14).text('Datos de Egresado', { underline: true });
-    document.moveDown(0.5);
-    document.fontSize(12);
-    const graduateType = formData.graduate?.graduateType ?? null;
-    const militaryRankId = formData.graduate?.militaryRankId ?? null;
-    const forceId = formData.graduate?.forceId ?? null;
-    document.text(`Tipo de egresado: ${formatValue(graduateType)}`);
-    document.text(`ID de grado militar: ${formatValue(militaryRankId)}`);
-    document.text(`ID de fuerza militar: ${formatValue(forceId)}`);
-
-    document.moveDown(2);
-    document.fontSize(10).text(`Generado el: ${new Date().toLocaleString('es-AR')}`);
-
-    document.end();
+  page.drawText(headerText, {
+    x: (PAGE_WIDTH - headerTextWidth) / 2,
+    y: headerTitleY,
+    size: headerTextSize,
+    font: helveticaBoldFont,
+    color: rgb(0, 0, 0)
   });
+
+  const signatureBlockX = PAGE_WIDTH - MARGIN_X - SIGNATURE_BLOCK_WIDTH;
+  const upperSignatureLineY = headerTitleY - 90;
+  const upperSignatureNameY = upperSignatureLineY - 18;
+  const upperSignatureLabelY = upperSignatureNameY - 12;
+
+  drawSignatureBlock(page, {
+    x: signatureBlockX,
+    width: SIGNATURE_BLOCK_WIDTH,
+    label: 'Firma y aclaración del solicitante',
+    name: uppercaseName,
+    font: helveticaFont,
+    boldFont: helveticaBoldFont,
+    lineY: upperSignatureLineY,
+    nameY: upperSignatureNameY,
+    labelY: upperSignatureLabelY
+  });
+
+  const hyphenSeparatorY = upperSignatureLabelY - 22;
+  drawHyphenSeparator(page, helveticaFont, hyphenSeparatorY);
+
+  // Informative paragraph
+  const paragraphTop = hyphenSeparatorY - 40;
+  const paragraphX = MARGIN_X;
+
+  const legalParagraph =
+    'Me notifico que, al momento de concluir el presente trámite, mis datos como graduado serán incluidos y publicados en el REGISTRO PÚBLICO DE GRADUADOS UNIVERSITARIOS (RM 3723/17).';
+
+  page.drawText(legalParagraph, {
+    x: paragraphX,
+    y: paragraphTop - 18,
+    size: 10,
+    font: helveticaFont,
+    color: rgb(0, 0, 0),
+    maxWidth: PAGE_WIDTH - paragraphX - MARGIN_X,
+    lineHeight: 14
+  });
+
+  // Lower signature block
+  const paragraphBaselineY = paragraphTop - 18;
+  const lowerSignatureLineY = paragraphBaselineY - 90;
+  const lowerSignatureNameY = lowerSignatureLineY - 18;
+  const lowerSignatureLabelY = lowerSignatureNameY - 12;
+
+  drawSignatureBlock(page, {
+    x: signatureBlockX,
+    width: SIGNATURE_BLOCK_WIDTH,
+    label: 'Firma y aclaración del solicitante',
+    name: uppercaseName,
+    font: helveticaFont,
+    boldFont: helveticaBoldFont,
+    lineY: lowerSignatureLineY,
+    nameY: lowerSignatureNameY,
+    labelY: lowerSignatureLabelY
+  });
+
+  const pdfBytes = await pdfDoc.save();
+
+  return Buffer.from(pdfBytes);
 };
