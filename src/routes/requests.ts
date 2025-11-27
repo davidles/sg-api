@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { createRequest } from '../controllers/requestsController';
+import { createRequest, getRequestEvaluation } from '../controllers/requestsController';
+
 import {
   getRequestRequirements,
   uploadRequestRequirementFile,
@@ -12,6 +13,7 @@ import { uploadMiddleware } from '../middleware/upload';
 const router = Router();
 
 router.post('/', createRequest);
+router.get('/:requestId/evaluation', getRequestEvaluation);
 router.get('/:requestId/requirements', getRequestRequirements);
 router.post(
   '/:requestId/requirements/:requirementInstanceId/file',

@@ -295,17 +295,29 @@ export const getDashboardDataForUser = async (
       requestTypeId
     );
 
-    const filteredSummaries = requirementSummaries.filter((summary) => {
-      if (!isAdmin) {
-        return summary.responsibility === RequirementResponsibility.GRADUATE;
+    const graduateSummaries = requirementSummaries.filter(
+      (summary) => summary.responsibility === RequirementResponsibility.GRADUATE
+    );
+
+    const hasAnyAccepted = graduateSummaries.some((summary) => summary.isAccepted);
+
+    const roleAwareSummaries = graduateSummaries.map((summary) => {
+      if (isAdmin) {
+        const useAccepted = hasAnyAccepted;
+
+        return {
+          ...summary,
+          isCompleted: useAccepted ? summary.isAccepted : summary.isCompleted
+        };
       }
 
-      return summary.responsibility === RequirementResponsibility.ADMINISTRATIVE;
+      return {
+        ...summary,
+        isCompleted: summary.isCompleted || summary.isAccepted
+      };
     });
 
-    const mergedSummaries = isAdmin ? requirementSummaries : filteredSummaries;
-
-    return mapRequestSummary(requestInstance, mergedSummaries);
+    return mapRequestSummary(requestInstance, roleAwareSummaries);
   });
 
   return {

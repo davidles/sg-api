@@ -9,10 +9,6 @@ export type RequirementResponsibilityEntry = {
   responsibility: RequirementResponsibility;
 };
 
-// Mapa inicial basado en la tabla `requisito` y tu aclaración.
-// requestTypeId=2 se corresponde con el tipo de solicitud de título actual.
-// - Requisitos 1-6,8,9,11: egresado
-// - Requisitos 7 y 10: administrativo
 const requirementResponsibilityMap: RequirementResponsibilityEntry[] = [
   { requestTypeId: 2, requirementId: 1, responsibility: RequirementResponsibility.GRADUATE },
   { requestTypeId: 2, requirementId: 2, responsibility: RequirementResponsibility.GRADUATE },
