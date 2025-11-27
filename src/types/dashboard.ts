@@ -4,6 +4,22 @@ export interface DashboardMenuOption {
   description: string | null;
 }
 
+export type RequirementResponsibilityType = 'GRADUATE' | 'ADMINISTRATIVE';
+
+export interface DashboardRequirementSummary {
+  requirementId: number | null;
+  requirementInstanceId: number | null;
+  requirementName: string | null;
+  requirementDescription: string | null;
+  statusId: number | null;
+  statusName: string | null;
+  completedByUserId: number | null;
+  verifiedByUserId: number | null;
+  responsibility: RequirementResponsibilityType;
+  isCompleted: boolean;
+  isAccepted: boolean;
+}
+
 export interface DashboardRequestSummary {
   idRequest: number;
   requestTypeName: string | null;
@@ -17,6 +33,7 @@ export interface DashboardRequestSummary {
   planName: string | null;
   totalRequirements: number | null;
   completedRequirements: number | null;
+  requirements?: DashboardRequirementSummary[];
 }
 
 export interface DashboardData {

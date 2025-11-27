@@ -8,6 +8,8 @@ import type { RequirementAttributes } from '../types/requirement';
 import type { RequirementInstanceStatusAttributes } from '../types/requirementInstanceStatus';
 import type { RequestRequirementInstanceInstance } from '../models/requestRequirementInstance';
 import type { RequirementInstanceStatusInstance } from '../models/requirementInstanceStatus';
+import type { RequestInstance } from '../models/request';
+import type { RequirementInstance } from '../models/requirement';
 import type { RequestStatusInstance } from '../models/requestStatus';
 import {
   REQUIREMENT_STATUS_COMPLETED_ID,
@@ -23,6 +25,10 @@ import {
   REQUEST_STATUS_TO_FIX_NAME,
   REQUEST_STATUS_TO_FIX_FALLBACK_NAMES
 } from '../constants/status';
+import requirementResponsibilityMap, {
+  RequirementResponsibility,
+  findResponsibility
+} from '../utils/requirementResponsibility';
 
 const ALLOWED_REQUIREMENT_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
@@ -58,6 +64,7 @@ export interface RequestRequirementItem {
     RequirementInstanceStatusAttributes,
     'idRequirementInstanceStatus' | 'requirementInstanceStatusName'
   > | null;
+  responsibility?: RequirementResponsibility;
 }
 
 export interface RequirementFilePayload {
@@ -114,7 +121,22 @@ export const getRequirementsForRequest = async (
         })
       : instances;
 
-  return filteredInstances.map(mapToItem);
+  const requestTypeId = (requestExists.getDataValue('requestTypeId') as number | null) ?? null;
+
+  return filteredInstances.map((instance) => {
+    const item = mapToItem(instance);
+    const requirementId = item.requirement?.idRequirement ?? null;
+    const responsibility = findResponsibility(
+      requirementResponsibilityMap,
+      requestTypeId,
+      requirementId
+    );
+
+    return {
+      ...item,
+      responsibility: responsibility ?? RequirementResponsibility.GRADUATE
+    };
+  });
 };
 
 const ensureDirectory = (directoryPath: string): void => {
@@ -450,22 +472,55 @@ const promoteRequestStatusIfRequirementsCompleted = async (
   const transactionToUse = transaction ?? (await sequelize.transaction());
   const shouldManageTransaction = !transaction;
 
-  const pendingRequirements = await models.requestRequirementInstance.count({
-    where: {
-      requestId: parsedRequestId,
-      [Op.or]: [
-        { currentRequirementStatusId: null },
-        {
-          currentRequirementStatusId: {
-            [Op.ne]: REQUIREMENT_STATUS_COMPLETED_ID
-          }
-        }
-      ]
-    },
+  // Cargar solicitud para conocer el tipo y poder mapear responsabilidades
+  const request = (await models.request.findByPk(parsedRequestId, {
+    transaction: transactionToUse
+  })) as RequestInstance | null;
+
+  if (!request) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw new Error('Solicitud no encontrada al intentar promover su estado.');
+  }
+
+  const requestTypeId = request.getDataValue('requestTypeId') ?? null;
+
+  // Traer todas las instancias de requisitos con su requisito asociado
+  const allRequirementInstances = await models.requestRequirementInstance.findAll({
+    where: { requestId: parsedRequestId },
+    include: [
+      {
+        model: models.requirement,
+        as: 'requirement'
+      }
+    ],
     transaction: transactionToUse
   });
 
-  if (pendingRequirements > 0) {
+  // Considerar solo requisitos cuyo responsable NO sea administrativo.
+  const graduateRequirementInstances = allRequirementInstances.filter((instance) => {
+    const requirementId = instance.getDataValue('requirementId') ?? null;
+    const responsibility = findResponsibility(
+      requirementResponsibilityMap,
+      requestTypeId,
+      requirementId
+    );
+
+    return responsibility !== RequirementResponsibility.ADMINISTRATIVE;
+  });
+
+  const hasPendingGraduateRequirement = graduateRequirementInstances.some((instance) => {
+    const statusId = instance.getDataValue('currentRequirementStatusId');
+
+    if (statusId === null || statusId === undefined) {
+      return true;
+    }
+
+    return statusId !== REQUIREMENT_STATUS_COMPLETED_ID;
+  });
+
+  if (hasPendingGraduateRequirement) {
     if (shouldManageTransaction) {
       await transactionToUse.rollback();
     }
