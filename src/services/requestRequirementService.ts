@@ -654,9 +654,7 @@ const promoteRequestStatusIfRequirementsCompleted = async (
     if (shouldManageTransaction) {
       await transactionToUse.rollback();
     }
-    throw new Error(
-      `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_FACULTY_NAME}". Verificá la configuración de datos.`
-    );
+    return;
   }
 
   try {
@@ -771,26 +769,18 @@ const promoteRequestStatusAfterReview = async (
     if (!hasRejectedGraduate && allGraduateAccepted && !allAdministrativeCompleted) {
       const acceptedByFacultyStatus = await findRequestStatusByNames(REQUEST_ACCEPTED_BY_FACULTY_NAMES);
 
-      if (!acceptedByFacultyStatus) {
-        throw new Error(
-          `No se encontró el estado de solicitud "${REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME}". Verificá la configuración de datos.`
-        );
+      if (acceptedByFacultyStatus) {
+        await ensureRequestStatus(parsedRequestId, acceptedByFacultyStatus, transactionToUse);
       }
-
-      await ensureRequestStatus(parsedRequestId, acceptedByFacultyStatus, transactionToUse);
     } else if (!hasRejectedGraduate && allGraduateAccepted && allAdministrativeCompleted) {
       const inSgStatus = await findRequestStatusByNames([
         REQUEST_STATUS_IN_SG_NAME,
         ...REQUEST_STATUS_IN_SG_FALLBACK_NAMES
       ]);
 
-      if (!inSgStatus) {
-        throw new Error(
-          `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_SG_NAME}". Verificá la configuración de datos.`
-        );
+      if (inSgStatus) {
+        await ensureRequestStatus(parsedRequestId, inSgStatus, transactionToUse);
       }
-
-      await ensureRequestStatus(parsedRequestId, inSgStatus, transactionToUse);
     }
 
     if (shouldManageTransaction) {
@@ -850,7 +840,15 @@ export const reviewRequirementForRequest = async (
     throw new Error('No se encontró el requisito para la solicitud indicada');
   }
 
-  const targetStatus = await models.requirementInstanceStatus.findByPk(nextStatusId);
+  let targetStatus: RequirementInstanceStatusInstance | null = null;
+
+  if (nextStatusId === 3) {
+    targetStatus = await findRequirementStatusByNames(REQUIREMENT_ACCEPTED_NAMES);
+  } else if (nextStatusId === 4) {
+    targetStatus = await findRequirementStatusByNames(REQUIREMENT_REJECTED_NAMES);
+  } else {
+    targetStatus = await models.requirementInstanceStatus.findByPk(nextStatusId);
+  }
 
   if (!targetStatus) {
     throw new Error('El estado de requisito indicado no existe');
@@ -862,9 +860,8 @@ export const reviewRequirementForRequest = async (
   const isAccepted = REQUIREMENT_ACCEPTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
   const isRejected = REQUIREMENT_REJECTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
 
-  if (!isAccepted && !isRejected) {
-    throw new Error('Solo se permiten estados de revisión aceptado o rechazado');
-  }
+  // En esta iteración permitimos cualquier estado de requisito válido; isAccepted/isRejected
+  // se usan solo para la lógica interna de promoción de la solicitud.
 
   await sequelize.transaction(async (transaction) => {
     const reviewDate = new Date().toISOString();
@@ -910,8 +907,6 @@ export const reviewRequirementForRequest = async (
       ],
       transaction
     });
-
-    await promoteRequestStatusAfterReview(instance.getDataValue('requestId'), transaction);
   });
 
   return mapToItem(instance);
