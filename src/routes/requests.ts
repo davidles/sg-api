@@ -3,8 +3,10 @@ import { createRequest } from '../controllers/requestsController';
 import {
   getRequestRequirements,
   uploadRequestRequirementFile,
-  downloadRequestRequirementFile
+  downloadRequestRequirementFile,
+  reviewRequestRequirement
 } from '../controllers/requestRequirementsController';
+
 import { uploadMiddleware } from '../middleware/upload';
 
 const router = Router();
@@ -17,5 +19,6 @@ router.post(
   uploadRequestRequirementFile
 );
 router.get('/:requestId/requirements/:requirementInstanceId/file', downloadRequestRequirementFile);
+router.post('/:requestId/requirements/:requirementInstanceId/review', reviewRequestRequirement);
 
 export default router;

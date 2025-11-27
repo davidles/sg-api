@@ -21,12 +21,35 @@ export type SerializedUser = {
   militaryRankId: number | null;
 };
 
+const mapRoleId = (rawRoleId: number | null | undefined): number | null => {
+  if (rawRoleId === null || rawRoleId === undefined) {
+    return null;
+  }
+
+  switch (rawRoleId) {
+    case 1: // Administrador
+      return 300;
+    case 2: // Administrativo Facultad
+      return 200;
+    case 3: // Egresado
+      return 100;
+    case 4: // Diplomado
+      return 120;
+    case 5: // Administrativo consultor
+      return 210;
+    default:
+      return rawRoleId;
+  }
+};
+
 export const serializeUser = (user: UserInstance): SerializedUser => {
   const person = user.get('person') as PersonInstance | null | undefined;
   const directContact = user.get('contact') as ContactInstance | null | undefined;
   const nestedContact = person?.get('contact') as ContactInstance | null | undefined;
   const contact = directContact ?? nestedContact ?? null;
   const graduate = person?.get('graduate') as GraduateInstance | null | undefined;
+
+  const normalizedRoleId = mapRoleId(user.getDataValue('roleId'));
 
   const rawBirthDate = person?.getDataValue('birthDate');
   const birthDate = rawBirthDate ? new Date(rawBirthDate).toISOString() : null;
@@ -35,7 +58,7 @@ export const serializeUser = (user: UserInstance): SerializedUser => {
     id: user.getDataValue('idUser'),
     username: user.getDataValue('username'),
     accountType: user.getDataValue('accountType') ?? null,
-    roleId: user.getDataValue('roleId') ?? null,
+    roleId: normalizedRoleId,
     personId: person?.getDataValue('idPerson') ?? null,
     firstName: person?.getDataValue('firstName') ?? null,
     lastName: person?.getDataValue('lastName') ?? null,
