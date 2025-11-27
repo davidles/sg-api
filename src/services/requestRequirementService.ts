@@ -472,7 +472,6 @@ const promoteRequestStatusIfRequirementsCompleted = async (
   const transactionToUse = transaction ?? (await sequelize.transaction());
   const shouldManageTransaction = !transaction;
 
-  // Cargar solicitud para conocer el tipo y poder mapear responsabilidades
   const request = (await models.request.findByPk(parsedRequestId, {
     transaction: transactionToUse
   })) as RequestInstance | null;
@@ -486,7 +485,6 @@ const promoteRequestStatusIfRequirementsCompleted = async (
 
   const requestTypeId = request.getDataValue('requestTypeId') ?? null;
 
-  // Traer todas las instancias de requisitos con su requisito asociado
   const allRequirementInstances = await models.requestRequirementInstance.findAll({
     where: { requestId: parsedRequestId },
     include: [
@@ -498,7 +496,6 @@ const promoteRequestStatusIfRequirementsCompleted = async (
     transaction: transactionToUse
   });
 
-  // Considerar solo requisitos cuyo responsable NO sea administrativo.
   const graduateRequirementInstances = allRequirementInstances.filter((instance) => {
     const requirementId = instance.getDataValue('requirementId') ?? null;
     const responsibility = findResponsibility(
