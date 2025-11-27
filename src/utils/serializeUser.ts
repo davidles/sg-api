@@ -2,6 +2,7 @@ import type { UserInstance } from '../models/user';
 import type { PersonInstance } from '../models/person';
 import type { ContactInstance } from '../models/contact';
 import type { GraduateInstance } from '../models/graduate';
+import { mapRoleId } from './role';
 
 export type SerializedUser = {
   id: number;
@@ -28,6 +29,8 @@ export const serializeUser = (user: UserInstance): SerializedUser => {
   const contact = directContact ?? nestedContact ?? null;
   const graduate = person?.get('graduate') as GraduateInstance | null | undefined;
 
+  const normalizedRoleId = mapRoleId(user.getDataValue('roleId'));
+
   const rawBirthDate = person?.getDataValue('birthDate');
   const birthDate = rawBirthDate ? new Date(rawBirthDate).toISOString() : null;
 
@@ -35,7 +38,7 @@ export const serializeUser = (user: UserInstance): SerializedUser => {
     id: user.getDataValue('idUser'),
     username: user.getDataValue('username'),
     accountType: user.getDataValue('accountType') ?? null,
-    roleId: user.getDataValue('roleId') ?? null,
+    roleId: normalizedRoleId,
     personId: person?.getDataValue('idPerson') ?? null,
     firstName: person?.getDataValue('firstName') ?? null,
     lastName: person?.getDataValue('lastName') ?? null,

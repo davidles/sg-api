@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import {
   getRequirementsForRequest,
   uploadRequirementFileForRequest,
-  getRequirementFileForRequest
+  getRequirementFileForRequest,
+  reviewRequirementForRequest
 } from '../services/requestRequirementService';
 
 export const getRequestRequirements = async (req: Request, res: Response): Promise<void> => {
@@ -25,6 +26,54 @@ export const getRequestRequirements = async (req: Request, res: Response): Promi
   try {
     const items = await getRequirementsForRequest(parsedRequestId, statusFilters);
     res.status(200).json({ data: items });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+  }
+};
+
+export const reviewRequestRequirement = async (req: Request, res: Response): Promise<void> => {
+  const { requestId, requirementInstanceId } = req.params;
+  const { nextStatusId, reviewReason, reviewerUserId } = req.body ?? {};
+
+  const parsedRequestId = Number(requestId);
+  const parsedRequirementInstanceId = Number(requirementInstanceId);
+  const parsedNextStatusId = Number(nextStatusId);
+  const parsedReviewerUserId = Number(reviewerUserId ?? req.body?.userId ?? req.query.userId);
+
+  if (!requestId || Number.isNaN(parsedRequestId) || parsedRequestId <= 0) {
+    res.status(400).json({ message: 'requestId debe ser un número positivo' });
+    return;
+  }
+
+  if (
+    !requirementInstanceId ||
+    Number.isNaN(parsedRequirementInstanceId) ||
+    parsedRequirementInstanceId <= 0
+  ) {
+    res.status(400).json({ message: 'requirementInstanceId debe ser un número positivo' });
+    return;
+  }
+
+  if (!Number.isInteger(parsedNextStatusId) || parsedNextStatusId <= 0) {
+    res.status(400).json({ message: 'nextStatusId debe ser un número positivo' });
+    return;
+  }
+
+  if (!Number.isInteger(parsedReviewerUserId) || parsedReviewerUserId <= 0) {
+    res.status(400).json({ message: 'reviewerUserId es obligatorio' });
+    return;
+  }
+
+  try {
+    const item = await reviewRequirementForRequest(
+      parsedRequestId,
+      parsedRequirementInstanceId,
+      parsedReviewerUserId,
+      parsedNextStatusId,
+      typeof reviewReason === 'string' ? reviewReason : null
+    );
+
+    res.status(200).json({ data: item });
   } catch (error) {
     res.status(400).json({ message: (error as Error).message });
   }

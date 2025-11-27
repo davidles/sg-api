@@ -3,6 +3,7 @@ import type { RequestTypeInstance } from '../models/requestType';
 import type { RequestInstance } from '../models/request';
 import type { RequestRequirementInstanceInstance } from '../models/requestRequirementInstance';
 import type { RequirementInstanceStatusInstance } from '../models/requirementInstanceStatus';
+import type { RequirementInstance } from '../models/requirement';
 import type { RequestStatusHistoryInstance } from '../models/requestStatusHistory';
 import type { RequestStatusInstance } from '../models/requestStatus';
 import type { TitleInstance } from '../models/title';
@@ -13,9 +14,21 @@ import { AppError } from '../utils/appError';
 import type {
   DashboardData,
   DashboardMenuOption,
-  DashboardRequestSummary
+  DashboardRequestSummary,
+  DashboardRequirementSummary
 } from '../types/dashboard';
-import { REQUIREMENT_STATUS_COMPLETED_ID } from '../constants/status';
+import {
+  REQUIREMENT_STATUS_COMPLETED_ID,
+  REQUIREMENT_STATUS_ACCEPTED_NAME,
+  REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES,
+  REQUEST_STATUS_IN_FACULTY_NAME,
+  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES
+} from '../constants/status';
+import { mapRoleId, isAdministrativeRole } from '../utils/role';
+import requirementResponsibilityMap, {
+  RequirementResponsibility,
+  findResponsibility
+} from '../utils/requirementResponsibility';
 
 const mapMenuOption = (instance: RequestTypeInstance): DashboardMenuOption => {
   const plain = instance.get({ plain: true });
@@ -94,7 +107,10 @@ const computeNextAction = (statusName: string | null): string => {
   return 'Ver detalle';
 };
 
-const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary => {
+const mapRequestSummary = (
+  instance: RequestInstance,
+  requirementSummaries: DashboardRequirementSummary[]
+): DashboardRequestSummary => {
   const mappedStatusHistory = (instance.get('statusHistory') as RequestStatusHistoryInstance[] | undefined) ?? [];
   const statusInfo = resolveLatestStatus(mappedStatusHistory);
   const requestType = instance.get('requestType') as RequestTypeInstance | null;
@@ -102,20 +118,8 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
   const studyPlan = title?.get('studyPlan') as StudyPlanInstance | null;
   const academicProgram = studyPlan?.get('academicProgram') as AcademicProgramInstance | null;
   const faculty = academicProgram?.get('faculty') as FacultyInstance | null;
-  const requirementInstances =
-    (instance.get('requirementInstances') as RequestRequirementInstanceInstance[] | undefined) ?? [];
-
-  const totalRequirements = requirementInstances.length;
-  const completedRequirements = requirementInstances.filter((requirementInstance) => {
-    const statusId = requirementInstance.getDataValue('currentRequirementStatusId');
-
-    if (typeof statusId === 'number') {
-      return statusId === REQUIREMENT_STATUS_COMPLETED_ID;
-    }
-
-    const statusInstance = requirementInstance.get('status') as RequirementInstanceStatusInstance | null;
-    return statusInstance?.getDataValue('idRequirementInstanceStatus') === REQUIREMENT_STATUS_COMPLETED_ID;
-  }).length;
+  const totalRequirements = requirementSummaries.length;
+  const completedRequirements = requirementSummaries.filter((item) => item.isCompleted).length;
 
   return {
     idRequest: instance.getDataValue('idRequest'),
@@ -129,11 +133,70 @@ const mapRequestSummary = (instance: RequestInstance): DashboardRequestSummary =
     facultyName: faculty?.getDataValue('facultyName') ?? null,
     planName: studyPlan?.getDataValue('studyPlanName') ?? null,
     totalRequirements,
-    completedRequirements
+    completedRequirements,
+    requirements: requirementSummaries
   };
 };
 
-export const getDashboardDataForUser = async (userId: number): Promise<DashboardData> => {
+const buildRequirementSummary = (
+  instances: RequestRequirementInstanceInstance[] | undefined,
+  requestTypeId: number | null | undefined
+): DashboardRequirementSummary[] => {
+  const requirementInstances = instances ?? [];
+
+  return requirementInstances.map((requirementInstance) => {
+    const requirement = requirementInstance.get('requirement') as RequirementInstance | null;
+    const status = requirementInstance.get('status') as RequirementInstanceStatusInstance | null;
+    const requirementId = requirementInstance.getDataValue('requirementId') ?? null;
+
+    const responsibility = findResponsibility(
+      requirementResponsibilityMap,
+      requestTypeId ?? null,
+      requirementId
+    );
+
+    const statusId = requirementInstance.getDataValue('currentRequirementStatusId');
+    let isCompleted = false;
+    let isAccepted = false;
+
+    if (typeof statusId === 'number') {
+      isCompleted = statusId === REQUIREMENT_STATUS_COMPLETED_ID;
+    }
+
+    if (!isCompleted && status) {
+      const statusName = status.getDataValue('requirementInstanceStatusName') ?? '';
+      isCompleted = statusName.toLowerCase() === REQUIREMENT_STATUS_COMPLETED_ID.toString();
+      const normalizedStatus = statusName.toLowerCase();
+      isAccepted = [
+        REQUIREMENT_STATUS_ACCEPTED_NAME,
+        ...REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES
+      ]
+        .map((value) => value.toLowerCase())
+        .includes(normalizedStatus);
+    }
+
+    const responsibilityOwner = responsibility ?? RequirementResponsibility.GRADUATE;
+
+    return {
+      requirementId,
+      requirementInstanceId: requirementInstance.getDataValue('idRequestRequirementInstance'),
+      requirementName: requirement?.getDataValue('requirementName') ?? null,
+      requirementDescription: requirement?.getDataValue('requirementDescription') ?? null,
+      statusId: statusId ?? status?.getDataValue('idRequirementInstanceStatus') ?? null,
+      statusName: status?.getDataValue('requirementInstanceStatusName') ?? null,
+      completedByUserId: requirementInstance.getDataValue('completedByUserId'),
+      verifiedByUserId: requirementInstance.getDataValue('verifiedByUserId'),
+      responsibility: responsibilityOwner,
+      isCompleted,
+      isAccepted
+    };
+  });
+};
+
+export const getDashboardDataForUser = async (
+  userId: number,
+  rawRoleId: number | null | undefined
+): Promise<DashboardData> => {
   if (!Number.isInteger(userId) || userId <= 0) {
     throw new AppError('El identificador de usuario es inválido', 400);
   }
@@ -144,69 +207,66 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
     throw new AppError('Usuario no encontrado', 404);
   }
 
+  const normalizedRoleId = mapRoleId(rawRoleId ?? user.getDataValue('roleId'));
   const requestTypes = await models.requestType.findAll({ order: [['requestTypeName', 'ASC']] });
 
   let requests: RequestInstance[] = [];
 
-  try {
-    requests = await models.request.findAll({
-      where: { userId },
+  const baseInclude = [
+    { model: models.requestType, as: 'requestType' },
+    {
+      model: models.title,
+      as: 'title',
       include: [
-        { model: models.requestType, as: 'requestType' },
         {
-          model: models.title,
-          as: 'title',
+          model: models.studyPlan,
+          as: 'studyPlan',
           include: [
             {
-              model: models.studyPlan,
-              as: 'studyPlan',
-              include: [
-                {
-                  model: models.academicProgram,
-                  as: 'academicProgram',
-                  include: [{ model: models.faculty, as: 'faculty' }]
-                }
-              ]
+              model: models.academicProgram,
+              as: 'academicProgram',
+              include: [{ model: models.faculty, as: 'faculty' }]
             }
           ]
-        },
-        {
-          model: models.requestStatusHistory,
-          as: 'statusHistory',
-          include: [{ model: models.requestStatus, as: 'status' }]
-        },
-        {
-          model: models.requestRequirementInstance,
-          as: 'requirementInstances',
-          include: [{ model: models.requirementInstanceStatus, as: 'status' }]
         }
-      ],
+      ]
+    },
+    {
+      model: models.requestStatusHistory,
+      as: 'statusHistory',
+      include: [{ model: models.requestStatus, as: 'status' }]
+    },
+    {
+      model: models.requestRequirementInstance,
+      as: 'requirementInstances',
+      include: [
+        { model: models.requirement, as: 'requirement' },
+        { model: models.requirementInstanceStatus, as: 'status' }
+      ]
+    }
+  ];
+
+  const isAdmin = isAdministrativeRole(normalizedRoleId);
+
+  try {
+    requests = await models.request.findAll({
+      where: isAdmin
+        ? {}
+        : {
+            userId
+          },
+      include: baseInclude,
       order: [['generatedAt', 'DESC']]
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('requeststatushistory')) {
       requests = await models.request.findAll({
-        where: { userId },
-        include: [
-          { model: models.requestType, as: 'requestType' },
-          {
-            model: models.title,
-            as: 'title',
-            include: [
-              {
-                model: models.studyPlan,
-                as: 'studyPlan',
-                include: [
-                  {
-                    model: models.academicProgram,
-                    as: 'academicProgram',
-                    include: [{ model: models.faculty, as: 'faculty' }]
-                  }
-                ]
-              }
-            ]
-          }
-        ],
+        where: isAdmin
+          ? {}
+          : {
+              userId
+            },
+        include: baseInclude.filter((relation) => relation !== baseInclude[2]),
         order: [['generatedAt', 'DESC']]
       });
     } else {
@@ -214,8 +274,39 @@ export const getDashboardDataForUser = async (userId: number): Promise<Dashboard
     }
   }
 
+  if (isAdmin) {
+    requests = requests.filter((requestInstance) => {
+      const statusHistory =
+        (requestInstance.get('statusHistory') as RequestStatusHistoryInstance[] | undefined) ?? [];
+      const latest = resolveLatestStatus(statusHistory);
+      const normalized = (latest.statusName ?? '').toLowerCase();
+      return [REQUEST_STATUS_IN_FACULTY_NAME, ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES]
+        .map((value) => value.toLowerCase())
+        .includes(normalized);
+    });
+  }
+
   const menuOptions = requestTypes.map(mapMenuOption);
-  const requestSummaries = requests.map(mapRequestSummary);
+  const requestSummaries = requests.map((requestInstance) => {
+    const requestTypeId = requestInstance.getDataValue('requestTypeId');
+    const requirementInstances = requestInstance.get('requirementInstances');
+    const requirementSummaries = buildRequirementSummary(
+      requirementInstances as RequestRequirementInstanceInstance[] | undefined,
+      requestTypeId
+    );
+
+    const filteredSummaries = requirementSummaries.filter((summary) => {
+      if (!isAdmin) {
+        return summary.responsibility === RequirementResponsibility.GRADUATE;
+      }
+
+      return summary.responsibility === RequirementResponsibility.ADMINISTRATIVE;
+    });
+
+    const mergedSummaries = isAdmin ? requirementSummaries : filteredSummaries;
+
+    return mapRequestSummary(requestInstance, mergedSummaries);
+  });
 
   return {
     menuOptions,

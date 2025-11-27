@@ -7,12 +7,28 @@ import type { RequestRequirementInstanceAttributes } from '../types/requestRequi
 import type { RequirementAttributes } from '../types/requirement';
 import type { RequirementInstanceStatusAttributes } from '../types/requirementInstanceStatus';
 import type { RequestRequirementInstanceInstance } from '../models/requestRequirementInstance';
+import type { RequirementInstanceStatusInstance } from '../models/requirementInstanceStatus';
+import type { RequestInstance } from '../models/request';
+import type { RequirementInstance } from '../models/requirement';
+import type { RequestStatusInstance } from '../models/requestStatus';
 import {
   REQUIREMENT_STATUS_COMPLETED_ID,
   REQUIREMENT_STATUS_COMPLETED_NAME,
+  REQUIREMENT_STATUS_ACCEPTED_NAME,
+  REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES,
+  REQUIREMENT_STATUS_REJECTED_NAME,
+  REQUIREMENT_STATUS_REJECTED_FALLBACK_NAMES,
   REQUEST_STATUS_IN_FACULTY_NAME,
-  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES
+  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES,
+  REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME,
+  REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES,
+  REQUEST_STATUS_TO_FIX_NAME,
+  REQUEST_STATUS_TO_FIX_FALLBACK_NAMES
 } from '../constants/status';
+import requirementResponsibilityMap, {
+  RequirementResponsibility,
+  findResponsibility
+} from '../utils/requirementResponsibility';
 
 const ALLOWED_REQUIREMENT_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
 const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
@@ -24,6 +40,23 @@ const MIME_TYPES_BY_EXTENSION: Record<string, string> = {
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
+const REQUIREMENT_ACCEPTED_NAMES = [
+  REQUIREMENT_STATUS_ACCEPTED_NAME,
+  ...REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES
+];
+
+const REQUIREMENT_REJECTED_NAMES = [
+  REQUIREMENT_STATUS_REJECTED_NAME,
+  ...REQUIREMENT_STATUS_REJECTED_FALLBACK_NAMES
+];
+
+const REQUEST_ACCEPTED_BY_FACULTY_NAMES = [
+  REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME,
+  ...REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES
+];
+
+const REQUEST_TO_FIX_NAMES = [REQUEST_STATUS_TO_FIX_NAME, ...REQUEST_STATUS_TO_FIX_FALLBACK_NAMES];
+
 export interface RequestRequirementItem {
   requirementInstance: RequestRequirementInstanceAttributes;
   requirement: Pick<RequirementAttributes, 'idRequirement' | 'requirementName' | 'requirementDescription'> | null;
@@ -31,6 +64,13 @@ export interface RequestRequirementItem {
     RequirementInstanceStatusAttributes,
     'idRequirementInstanceStatus' | 'requirementInstanceStatusName'
   > | null;
+  responsibility?: RequirementResponsibility;
+}
+
+export interface RequirementFilePayload {
+  fileName: string;
+  mimeType: string;
+  buffer: Buffer;
 }
 
 export const getRequirementsForRequest = async (
@@ -81,7 +121,22 @@ export const getRequirementsForRequest = async (
         })
       : instances;
 
-  return filteredInstances.map(mapToItem);
+  const requestTypeId = (requestExists.getDataValue('requestTypeId') as number | null) ?? null;
+
+  return filteredInstances.map((instance) => {
+    const item = mapToItem(instance);
+    const requirementId = item.requirement?.idRequirement ?? null;
+    const responsibility = findResponsibility(
+      requirementResponsibilityMap,
+      requestTypeId,
+      requirementId
+    );
+
+    return {
+      ...item,
+      responsibility: responsibility ?? RequirementResponsibility.GRADUATE
+    };
+  });
 };
 
 const ensureDirectory = (directoryPath: string): void => {
@@ -117,6 +172,77 @@ const mapToItem = (instance: RequestRequirementInstanceInstance): RequestRequire
         }
       : null
   };
+};
+
+const findRequirementStatusByNames = async (
+  statusNames: string[]
+): Promise<RequirementInstanceStatusInstance | null> => {
+  return models.requirementInstanceStatus.findOne({
+    where: {
+      requirementInstanceStatusName: {
+        [Op.in]: statusNames
+      }
+    }
+  });
+};
+
+const findRequestStatusByNames = async (statusNames: string[]): Promise<RequestStatusInstance | null> => {
+  return models.requestStatus.findOne({
+    where: {
+      requestStatusName: {
+        [Op.in]: statusNames
+      }
+    }
+  });
+};
+
+const ensureRequestStatus = async (
+  requestId: number,
+  targetStatus: RequestStatusInstance,
+  transaction: Transaction
+): Promise<void> => {
+  const targetStatusId = targetStatus.getDataValue('idRequestStatus');
+  const latestHistory = await models.requestStatusHistory.findOne({
+    where: {
+      requestId
+    },
+    order: [['statusStartDate', 'DESC']],
+    transaction
+  });
+
+  const nowIso = new Date().toISOString();
+
+  if (latestHistory) {
+    const latestStatusId = latestHistory.getDataValue('requestStatusId');
+    const hasOpenHistory = !latestHistory.getDataValue('statusEndDate');
+
+    if (latestStatusId === targetStatusId) {
+      if (!hasOpenHistory) {
+        return;
+      }
+
+      return;
+    }
+
+    if (hasOpenHistory) {
+      await latestHistory.update(
+        {
+          statusEndDate: nowIso
+        },
+        { transaction }
+      );
+    }
+  }
+
+  await models.requestStatusHistory.create(
+    {
+      requestId,
+      requestStatusId: targetStatusId,
+      statusStartDate: nowIso,
+      statusEndDate: null
+    },
+    { transaction }
+  );
 };
 
 const validateUploadedFile = (filePath: string): { absolutePath: string; extension: string; mimeType: string } => {
@@ -273,121 +399,6 @@ export const uploadRequirementFileForRequest = async (
   return mapToItem(instance);
 };
 
-const promoteRequestStatusIfRequirementsCompleted = async (
-  requestId: number | null | undefined,
-  transaction?: Transaction
-): Promise<void> => {
-  if (!Number.isInteger(requestId) || (requestId as number) <= 0) {
-    return;
-  }
-
-  const parsedRequestId = Number(requestId);
-
-  const transactionToUse = transaction ?? (await sequelize.transaction());
-  const shouldManageTransaction = !transaction;
-
-  const pendingRequirements = await models.requestRequirementInstance.count({
-    where: {
-      requestId: parsedRequestId,
-      [Op.or]: [
-        { currentRequirementStatusId: null },
-        {
-          currentRequirementStatusId: {
-            [Op.ne]: REQUIREMENT_STATUS_COMPLETED_ID
-          }
-        }
-      ]
-    },
-    transaction: transactionToUse
-  });
-
-  if (pendingRequirements > 0) {
-    if (shouldManageTransaction) {
-      await transactionToUse.rollback();
-    }
-    return;
-  }
-
-  const statusCandidates = [REQUEST_STATUS_IN_FACULTY_NAME, ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES];
-
-  const targetStatus = await models.requestStatus.findOne({
-    where: {
-      requestStatusName: {
-        [Op.in]: statusCandidates
-      }
-    },
-    transaction: transactionToUse
-  });
-
-  if (!targetStatus) {
-    if (shouldManageTransaction) {
-      await transactionToUse.rollback();
-    }
-    throw new Error(
-      `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_FACULTY_NAME}". Verificá la configuración de datos.`
-    );
-  }
-
-  try {
-    const latestHistory = await models.requestStatusHistory.findOne({
-      where: {
-        requestId: parsedRequestId
-      },
-      order: [['statusStartDate', 'DESC']],
-      transaction: transactionToUse
-    });
-
-    const targetStatusId = targetStatus.getDataValue('idRequestStatus');
-    const nowIso = new Date().toISOString();
-
-    if (latestHistory) {
-      const latestStatusId = latestHistory.getDataValue('requestStatusId');
-      const hasOpenHistory = !latestHistory.getDataValue('statusEndDate');
-
-      if (latestStatusId === targetStatusId) {
-        if (shouldManageTransaction) {
-          await transactionToUse.rollback();
-        }
-        return;
-      }
-
-      if (hasOpenHistory) {
-        await latestHistory.update(
-          {
-            statusEndDate: nowIso
-          },
-          { transaction: transactionToUse }
-        );
-      }
-    }
-
-    await models.requestStatusHistory.create(
-      {
-        requestId: parsedRequestId,
-        requestStatusId: targetStatusId,
-        statusStartDate: nowIso,
-        statusEndDate: null
-      },
-      { transaction: transactionToUse }
-    );
-
-    if (shouldManageTransaction) {
-      await transactionToUse.commit();
-    }
-  } catch (error) {
-    if (shouldManageTransaction) {
-      await transactionToUse.rollback();
-    }
-    throw error;
-  }
-};
-
-export interface RequirementFilePayload {
-  fileName: string;
-  mimeType: string;
-  buffer: Buffer;
-}
-
 export const getRequirementFileForRequest = async (
   requestId: number,
   requirementInstanceId: number
@@ -446,4 +457,281 @@ export const getRequirementFileForRequest = async (
     mimeType,
     buffer
   };
+};
+
+const promoteRequestStatusIfRequirementsCompleted = async (
+  requestId: number | null | undefined,
+  transaction?: Transaction
+): Promise<void> => {
+  if (!Number.isInteger(requestId) || (requestId as number) <= 0) {
+    return;
+  }
+
+  const parsedRequestId = Number(requestId);
+
+  const transactionToUse = transaction ?? (await sequelize.transaction());
+  const shouldManageTransaction = !transaction;
+
+  // Cargar solicitud para conocer el tipo y poder mapear responsabilidades
+  const request = (await models.request.findByPk(parsedRequestId, {
+    transaction: transactionToUse
+  })) as RequestInstance | null;
+
+  if (!request) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw new Error('Solicitud no encontrada al intentar promover su estado.');
+  }
+
+  const requestTypeId = request.getDataValue('requestTypeId') ?? null;
+
+  // Traer todas las instancias de requisitos con su requisito asociado
+  const allRequirementInstances = await models.requestRequirementInstance.findAll({
+    where: { requestId: parsedRequestId },
+    include: [
+      {
+        model: models.requirement,
+        as: 'requirement'
+      }
+    ],
+    transaction: transactionToUse
+  });
+
+  // Considerar solo requisitos cuyo responsable NO sea administrativo.
+  const graduateRequirementInstances = allRequirementInstances.filter((instance) => {
+    const requirementId = instance.getDataValue('requirementId') ?? null;
+    const responsibility = findResponsibility(
+      requirementResponsibilityMap,
+      requestTypeId,
+      requirementId
+    );
+
+    return responsibility !== RequirementResponsibility.ADMINISTRATIVE;
+  });
+
+  const hasPendingGraduateRequirement = graduateRequirementInstances.some((instance) => {
+    const statusId = instance.getDataValue('currentRequirementStatusId');
+
+    if (statusId === null || statusId === undefined) {
+      return true;
+    }
+
+    return statusId !== REQUIREMENT_STATUS_COMPLETED_ID;
+  });
+
+  if (hasPendingGraduateRequirement) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    return;
+  }
+
+  const targetStatus = await findRequestStatusByNames([
+    REQUEST_STATUS_IN_FACULTY_NAME,
+    ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES
+  ]);
+
+  if (!targetStatus) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw new Error(
+      `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_FACULTY_NAME}". Verificá la configuración de datos.`
+    );
+  }
+
+  try {
+    await ensureRequestStatus(parsedRequestId, targetStatus, transactionToUse);
+
+    if (shouldManageTransaction) {
+      await transactionToUse.commit();
+    }
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw error;
+  }
+};
+
+const promoteRequestStatusAfterReview = async (
+  requestId: number | null | undefined,
+  transaction?: Transaction
+): Promise<void> => {
+  if (!Number.isInteger(requestId) || (requestId as number) <= 0) {
+    return;
+  }
+
+  const parsedRequestId = Number(requestId);
+
+  const transactionToUse = transaction ?? (await sequelize.transaction());
+  const shouldManageTransaction = !transaction;
+
+  try {
+    const requirementInstances = await models.requestRequirementInstance.findAll({
+      where: {
+        requestId: parsedRequestId
+      },
+      attributes: ['currentRequirementStatusId'],
+      transaction: transactionToUse
+    });
+
+    if (requirementInstances.length === 0) {
+      if (shouldManageTransaction) {
+        await transactionToUse.commit();
+      }
+      return;
+    }
+
+    const acceptedStatus = await findRequirementStatusByNames(REQUIREMENT_ACCEPTED_NAMES);
+    const rejectedStatus = await findRequirementStatusByNames(REQUIREMENT_REJECTED_NAMES);
+
+    if (!acceptedStatus || !rejectedStatus) {
+      throw new Error(
+        'No se encontraron los estados de requisito para revisión. Verificá la configuración de datos.'
+      );
+    }
+
+    const acceptedId = acceptedStatus.getDataValue('idRequirementInstanceStatus');
+    const rejectedId = rejectedStatus.getDataValue('idRequirementInstanceStatus');
+
+    const hasRejected = requirementInstances.some((instance) => {
+      const statusId = instance.getDataValue('currentRequirementStatusId');
+      return statusId === rejectedId;
+    });
+
+    const allAccepted = requirementInstances.every((instance) => {
+      const statusId = instance.getDataValue('currentRequirementStatusId');
+      return statusId === acceptedId;
+    });
+
+    if (hasRejected) {
+      const toFixStatus = await findRequestStatusByNames(REQUEST_TO_FIX_NAMES);
+
+      if (!toFixStatus) {
+        throw new Error(
+          `No se encontró el estado de solicitud "${REQUEST_STATUS_TO_FIX_NAME}". Verificá la configuración de datos.`
+        );
+      }
+
+      await ensureRequestStatus(parsedRequestId, toFixStatus, transactionToUse);
+    } else if (allAccepted) {
+      const acceptedByFacultyStatus = await findRequestStatusByNames(REQUEST_ACCEPTED_BY_FACULTY_NAMES);
+
+      if (!acceptedByFacultyStatus) {
+        throw new Error(
+          `No se encontró el estado de solicitud "${REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME}". Verificá la configuración de datos.`
+        );
+      }
+
+      await ensureRequestStatus(parsedRequestId, acceptedByFacultyStatus, transactionToUse);
+    }
+
+    if (shouldManageTransaction) {
+      await transactionToUse.commit();
+    }
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await transactionToUse.rollback();
+    }
+    throw error;
+  }
+};
+
+export const reviewRequirementForRequest = async (
+  requestId: number,
+  requirementInstanceId: number,
+  reviewerUserId: number,
+  nextStatusId: number,
+  reviewReason?: string | null
+): Promise<RequestRequirementItem> => {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    throw new Error('requestId debe ser un número positivo');
+  }
+
+  if (!Number.isInteger(requirementInstanceId) || requirementInstanceId <= 0) {
+    throw new Error('requirementInstanceId debe ser un número positivo');
+  }
+
+  if (!Number.isInteger(reviewerUserId) || reviewerUserId <= 0) {
+    throw new Error('reviewerUserId debe ser un número positivo');
+  }
+
+  if (!Number.isInteger(nextStatusId) || nextStatusId <= 0) {
+    throw new Error('nextStatusId debe ser un número positivo');
+  }
+
+  const instance = await models.requestRequirementInstance.findOne({
+    where: {
+      idRequestRequirementInstance: requirementInstanceId,
+      requestId
+    },
+    include: [
+      {
+        model: models.requirement,
+        as: 'requirement',
+        attributes: ['idRequirement', 'requirementName', 'requirementDescription']
+      },
+      {
+        model: models.requirementInstanceStatus,
+        as: 'status',
+        attributes: ['idRequirementInstanceStatus', 'requirementInstanceStatusName']
+      }
+    ]
+  });
+
+  if (!instance) {
+    throw new Error('No se encontró el requisito para la solicitud indicada');
+  }
+
+  const targetStatus = await models.requirementInstanceStatus.findByPk(nextStatusId);
+
+  if (!targetStatus) {
+    throw new Error('El estado de requisito indicado no existe');
+  }
+
+  const targetStatusName = targetStatus.getDataValue('requirementInstanceStatusName') ?? '';
+  const normalizedTarget = targetStatusName.toLowerCase();
+
+  const isAccepted = REQUIREMENT_ACCEPTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
+  const isRejected = REQUIREMENT_REJECTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
+
+  if (!isAccepted && !isRejected) {
+    throw new Error('Solo se permiten estados de revisión aceptado o rechazado');
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    const reviewDate = new Date().toISOString();
+
+    await instance.update(
+      {
+        verifiedByUserId: reviewerUserId,
+        verifiedAt: reviewDate,
+        currentRequirementStatusId: nextStatusId,
+        reviewReason: typeof reviewReason === 'string' ? reviewReason : null
+      },
+      { transaction }
+    );
+
+    await instance.reload({
+      include: [
+        {
+          model: models.requirement,
+          as: 'requirement',
+          attributes: ['idRequirement', 'requirementName', 'requirementDescription']
+        },
+        {
+          model: models.requirementInstanceStatus,
+          as: 'status',
+          attributes: ['idRequirementInstanceStatus', 'requirementInstanceStatusName']
+        }
+      ],
+      transaction
+    });
+
+    await promoteRequestStatusAfterReview(instance.getDataValue('requestId'), transaction);
+  });
+
+  return mapToItem(instance);
 };
