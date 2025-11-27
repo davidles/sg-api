@@ -23,7 +23,9 @@ import {
   REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME,
   REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES,
   REQUEST_STATUS_TO_FIX_NAME,
-  REQUEST_STATUS_TO_FIX_FALLBACK_NAMES
+  REQUEST_STATUS_TO_FIX_FALLBACK_NAMES,
+  REQUEST_STATUS_IN_SG_NAME,
+  REQUEST_STATUS_IN_SG_FALLBACK_NAMES
 } from '../constants/status';
 import requirementResponsibilityMap, {
   RequirementResponsibility,
@@ -137,6 +139,125 @@ export const getRequirementsForRequest = async (
       responsibility: responsibility ?? RequirementResponsibility.GRADUATE
     };
   });
+};
+
+export const evaluateRequestStatus = async (
+  requestId: number
+): Promise<{
+  requestId: number;
+  requestStatusId: number | null;
+  requestStatusName: string | null;
+  totalGraduateRequirements: number;
+  completedGraduateRequirements: number;
+  acceptedGraduateRequirements: number;
+  hasRejectedGraduateRequirements: boolean;
+}> => {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    throw new Error('requestId debe ser un número positivo');
+  }
+
+  const request = await models.request.findByPk(requestId, {
+    include: [
+      {
+        model: models.requestStatusHistory,
+        as: 'statusHistory',
+        include: [{ model: models.requestStatus, as: 'status' }]
+      }
+    ]
+  });
+
+  if (!request) {
+    throw new Error('Solicitud no encontrada');
+  }
+
+  const statusHistory = (request.get('statusHistory') as any[]) ?? [];
+
+  const latestStatus = statusHistory
+    .slice()
+    .sort((a, b) => {
+      const aDate = a.getDataValue('statusStartDate');
+      const bDate = b.getDataValue('statusStartDate');
+
+      if (!aDate && !bDate) {
+        return 0;
+      }
+
+      if (!aDate) {
+        return 1;
+      }
+
+      if (!bDate) {
+        return -1;
+      }
+
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    })[0];
+
+  const latestStatusInstance = latestStatus?.get('status') as RequestStatusInstance | null;
+
+  const statusId = latestStatusInstance?.getDataValue('idRequestStatus') ?? null;
+  const statusName = latestStatusInstance?.getDataValue('requestStatusName') ?? null;
+
+  const requirements = await getRequirementsForRequest(requestId, undefined);
+
+  const graduateRequirements = requirements.filter(
+    (item) => item.responsibility === RequirementResponsibility.GRADUATE
+  );
+
+  const totalGraduateRequirements = graduateRequirements.length;
+
+  let completedGraduateRequirements = 0;
+  let acceptedGraduateRequirements = 0;
+  let hasRejectedGraduateRequirements = false;
+
+  for (const item of graduateRequirements) {
+    const status = item.status?.requirementInstanceStatusName ?? '';
+    const normalized = status.toLowerCase();
+
+    if (!status) {
+      continue;
+    }
+
+    const isCompleted =
+      normalized === REQUIREMENT_STATUS_COMPLETED_NAME.toLowerCase() ||
+      normalized === REQUIREMENT_STATUS_ACCEPTED_NAME.toLowerCase();
+
+    const isAccepted = [
+      REQUIREMENT_STATUS_ACCEPTED_NAME,
+      ...REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES
+    ]
+      .map((value) => value.toLowerCase())
+      .includes(normalized);
+
+    const isRejected = [
+      REQUIREMENT_STATUS_REJECTED_NAME,
+      ...REQUIREMENT_STATUS_REJECTED_FALLBACK_NAMES
+    ]
+      .map((value) => value.toLowerCase())
+      .includes(normalized);
+
+    if (isCompleted) {
+      completedGraduateRequirements += 1;
+    }
+
+    if (isAccepted) {
+      acceptedGraduateRequirements += 1;
+    }
+
+    if (isRejected) {
+      hasRejectedGraduateRequirements = true;
+    }
+  }
+
+  return {
+    requestId,
+    requestStatusId: statusId,
+    requestStatusName: statusName,
+    totalGraduateRequirements,
+    completedGraduateRequirements,
+    acceptedGraduateRequirements,
+    hasRejectedGraduateRequirements
+  };
 };
 
 const ensureDirectory = (directoryPath: string): void => {
@@ -570,7 +691,12 @@ const promoteRequestStatusAfterReview = async (
       where: {
         requestId: parsedRequestId
       },
-      attributes: ['currentRequirementStatusId'],
+      include: [
+        {
+          model: models.requirement,
+          as: 'requirement'
+        }
+      ],
       transaction: transactionToUse
     });
 
@@ -593,27 +719,56 @@ const promoteRequestStatusAfterReview = async (
     const acceptedId = acceptedStatus.getDataValue('idRequirementInstanceStatus');
     const rejectedId = rejectedStatus.getDataValue('idRequirementInstanceStatus');
 
-    const hasRejected = requirementInstances.some((instance) => {
+    const request = (await models.request.findByPk(parsedRequestId, {
+      transaction: transactionToUse
+    })) as RequestInstance | null;
+
+    if (!request) {
+      throw new Error('Solicitud no encontrada al evaluar su estado después de la revisión.');
+    }
+
+    const requestTypeId = request.getDataValue('requestTypeId') ?? null;
+
+    const graduateRequirementInstances = requirementInstances.filter((instance) => {
+      const requirementId = instance.getDataValue('requirementId') ?? null;
+      const responsibility = findResponsibility(
+        requirementResponsibilityMap,
+        requestTypeId,
+        requirementId
+      );
+
+      return responsibility !== RequirementResponsibility.ADMINISTRATIVE;
+    });
+
+    const administrativeRequirementInstances = requirementInstances.filter((instance) => {
+      const requirementId = instance.getDataValue('requirementId') ?? null;
+      const responsibility = findResponsibility(
+        requirementResponsibilityMap,
+        requestTypeId,
+        requirementId
+      );
+
+      return responsibility === RequirementResponsibility.ADMINISTRATIVE;
+    });
+
+    const hasRejectedGraduate = graduateRequirementInstances.some((instance) => {
       const statusId = instance.getDataValue('currentRequirementStatusId');
       return statusId === rejectedId;
     });
 
-    const allAccepted = requirementInstances.every((instance) => {
+    const allGraduateAccepted =
+      graduateRequirementInstances.length > 0 &&
+      graduateRequirementInstances.every((instance) => {
+        const statusId = instance.getDataValue('currentRequirementStatusId');
+        return statusId === acceptedId;
+      });
+
+    const allAdministrativeCompleted = administrativeRequirementInstances.every((instance) => {
       const statusId = instance.getDataValue('currentRequirementStatusId');
-      return statusId === acceptedId;
+      return statusId === REQUIREMENT_STATUS_COMPLETED_ID;
     });
 
-    if (hasRejected) {
-      const toFixStatus = await findRequestStatusByNames(REQUEST_TO_FIX_NAMES);
-
-      if (!toFixStatus) {
-        throw new Error(
-          `No se encontró el estado de solicitud "${REQUEST_STATUS_TO_FIX_NAME}". Verificá la configuración de datos.`
-        );
-      }
-
-      await ensureRequestStatus(parsedRequestId, toFixStatus, transactionToUse);
-    } else if (allAccepted) {
+    if (!hasRejectedGraduate && allGraduateAccepted && !allAdministrativeCompleted) {
       const acceptedByFacultyStatus = await findRequestStatusByNames(REQUEST_ACCEPTED_BY_FACULTY_NAMES);
 
       if (!acceptedByFacultyStatus) {
@@ -623,6 +778,19 @@ const promoteRequestStatusAfterReview = async (
       }
 
       await ensureRequestStatus(parsedRequestId, acceptedByFacultyStatus, transactionToUse);
+    } else if (!hasRejectedGraduate && allGraduateAccepted && allAdministrativeCompleted) {
+      const inSgStatus = await findRequestStatusByNames([
+        REQUEST_STATUS_IN_SG_NAME,
+        ...REQUEST_STATUS_IN_SG_FALLBACK_NAMES
+      ]);
+
+      if (!inSgStatus) {
+        throw new Error(
+          `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_SG_NAME}". Verificá la configuración de datos.`
+        );
+      }
+
+      await ensureRequestStatus(parsedRequestId, inSgStatus, transactionToUse);
     }
 
     if (shouldManageTransaction) {
@@ -701,12 +869,28 @@ export const reviewRequirementForRequest = async (
   await sequelize.transaction(async (transaction) => {
     const reviewDate = new Date().toISOString();
 
+    const previousFilePath = instance.getDataValue('requirementFilePath');
+
+    if (isRejected && previousFilePath) {
+      const absolutePreviousPath = path.isAbsolute(previousFilePath)
+        ? previousFilePath
+        : path.resolve(process.cwd(), previousFilePath);
+
+      try {
+        if (fs.existsSync(absolutePreviousPath)) {
+          fs.unlinkSync(absolutePreviousPath);
+        }
+      } catch (error) {}
+    }
+
     await instance.update(
       {
         verifiedByUserId: reviewerUserId,
         verifiedAt: reviewDate,
         currentRequirementStatusId: nextStatusId,
-        reviewReason: typeof reviewReason === 'string' ? reviewReason : null
+        reviewReason: typeof reviewReason === 'string' ? reviewReason : null,
+        requirementFilePath: isRejected ? null : instance.getDataValue('requirementFilePath'),
+        fileBlob: isRejected ? null : instance.getDataValue('fileBlob')
       },
       { transaction }
     );

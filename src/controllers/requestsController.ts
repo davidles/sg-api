@@ -8,6 +8,7 @@ import {
   REQUEST_STATUS_PENDING_NAME,
   REQUIREMENT_STATUS_INITIAL_ID
 } from '../constants/status';
+import { evaluateRequestStatus } from '../services/requestRequirementService';
 
 type CreateRequestPayload = {
   idUser?: number | string;
@@ -176,4 +177,21 @@ const createRequest = async (req: ExpressRequest, res: Response): Promise<void> 
   }
 };
 
-export { createRequest };
+const getRequestEvaluation = async (req: ExpressRequest, res: Response): Promise<void> => {
+  try {
+    const requestId = Number(req.params.requestId);
+
+    if (!Number.isInteger(requestId) || requestId <= 0) {
+      res.status(400).json({ message: 'requestId debe ser un número positivo' });
+      return;
+    }
+
+    const evaluation = await evaluateRequestStatus(requestId);
+
+    res.status(200).json({ data: evaluation });
+  } catch (error) {
+    res.status(500).json({ message: 'Error al evaluar el estado de la solicitud', error });
+  }
+};
+
+export { createRequest, getRequestEvaluation };
