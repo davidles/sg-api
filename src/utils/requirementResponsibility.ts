@@ -1,6 +1,7 @@
 export enum RequirementResponsibility {
   GRADUATE = 'GRADUATE',
-  ADMINISTRATIVE = 'ADMINISTRATIVE',
+  FACULTY = 'FACULTY',
+  SECRETARIA_GENERAL = 'SECRETARIA_GENERAL',
 }
 
 export type RequirementResponsibilityEntry = {
@@ -16,11 +17,12 @@ const requirementResponsibilityMap: RequirementResponsibilityEntry[] = [
   { requestTypeId: 2, requirementId: 4, responsibility: RequirementResponsibility.GRADUATE },
   { requestTypeId: 2, requirementId: 5, responsibility: RequirementResponsibility.GRADUATE },
   { requestTypeId: 2, requirementId: 6, responsibility: RequirementResponsibility.GRADUATE },
-  { requestTypeId: 2, requirementId: 7, responsibility: RequirementResponsibility.ADMINISTRATIVE },
-  { requestTypeId: 2, requirementId: 8, responsibility: RequirementResponsibility.GRADUATE },
-  { requestTypeId: 2, requirementId: 9, responsibility: RequirementResponsibility.GRADUATE },
-  { requestTypeId: 2, requirementId: 10, responsibility: RequirementResponsibility.ADMINISTRATIVE },
+  { requestTypeId: 2, requirementId: 7, responsibility: RequirementResponsibility.FACULTY },
+  { requestTypeId: 2, requirementId: 8, responsibility: RequirementResponsibility.FACULTY },
+  { requestTypeId: 2, requirementId: 9, responsibility: RequirementResponsibility.FACULTY },
+  { requestTypeId: 2, requirementId: 10, responsibility: RequirementResponsibility.SECRETARIA_GENERAL },
   { requestTypeId: 2, requirementId: 11, responsibility: RequirementResponsibility.GRADUATE },
+  { requestTypeId: 1, requirementId: 12, responsibility: RequirementResponsibility.SECRETARIA_GENERAL },
 ];
 
 export const findResponsibility = (

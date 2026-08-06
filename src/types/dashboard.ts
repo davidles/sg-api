@@ -4,7 +4,7 @@ export interface DashboardMenuOption {
   description: string | null;
 }
 
-export type RequirementResponsibilityType = 'GRADUATE' | 'ADMINISTRATIVE';
+export type RequirementResponsibilityType = 'GRADUATE' | 'FACULTY' | 'SECRETARIA_GENERAL';
 
 export interface DashboardRequirementSummary {
   requirementId: number | null;

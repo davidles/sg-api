@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { createRequest, getRequestEvaluation } from '../controllers/requestsController';
+import {
+  createRequest,
+  getRequestEvaluation,
+  markRequestDiplomaReady,
+  markRequestDiplomaDelivered
+} from '../controllers/requestsController';
 
 import {
   getRequestRequirements,
@@ -22,5 +27,7 @@ router.post(
 );
 router.get('/:requestId/requirements/:requirementInstanceId/file', downloadRequestRequirementFile);
 router.post('/:requestId/requirements/:requirementInstanceId/review', reviewRequestRequirement);
+router.post('/:requestId/diploma/ready', markRequestDiplomaReady);
+router.post('/:requestId/diploma/delivered', markRequestDiplomaDelivered);
 
 export default router;

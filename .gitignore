@@ -28,3 +28,9 @@ Thumbs.db
 secretary-portal.sql
 responseDB
 context/*
+
+# Ejemplos de referencia de requisitos, uso personal, no se suben
+requisitos/
+
+# Archivos subidos por egresados/administrativos (contenido de usuarios, no de código)
+uploads/
