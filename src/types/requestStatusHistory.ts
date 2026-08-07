@@ -1,4 +1,5 @@
 export interface RequestStatusHistoryAttributes {
+  idHistorial?: number;
   requestId: number | null;
   requestStatusId: number | null;
   statusStartDate: string | null;

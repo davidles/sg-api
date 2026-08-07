@@ -16,23 +16,27 @@ export const initRequestStatusHistoryModel = (
   const requestStatusHistory = sequelize.define<RequestStatusHistoryInstance>(
     'RequestStatusHistory',
     {
+      idHistorial: {
+        field: 'idHistorial',
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true
+      },
       requestId: {
         field: 'idSolicitud',
         type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: false,
-        primaryKey: true
+        allowNull: false
       },
       requestStatusId: {
         field: 'idSolicitudEstado',
         type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: false,
-        primaryKey: true
+        allowNull: false
       },
       statusStartDate: {
         field: 'fechaInicio_SolicitudEstado',
         type: DataTypes.DATE,
-        allowNull: true,
-        primaryKey: true
+        allowNull: true
       },
       statusEndDate: {
         field: 'FechaFin_SolicitudEstado',

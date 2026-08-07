@@ -22,9 +22,15 @@ import {
   REQUIREMENT_STATUS_ACCEPTED_NAME,
   REQUIREMENT_STATUS_ACCEPTED_FALLBACK_NAMES,
   REQUEST_STATUS_IN_FACULTY_NAME,
-  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES
+  REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES,
+  REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME,
+  REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES,
+  REQUEST_STATUS_IN_SG_NAME,
+  REQUEST_STATUS_IN_SG_FALLBACK_NAMES,
+  REQUEST_STATUS_IN_UNDEF_NAME,
+  REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES
 } from '../constants/status';
-import { mapRoleId, isAdministrativeRole } from '../utils/role';
+import { mapRoleId, isAdministrativeRole, SECRETARIA_GENERAL_ROLE_ID, UNDEF_ROLE_ID } from '../utils/role';
 import requirementResponsibilityMap, {
   RequirementResponsibility,
   findResponsibility
@@ -50,24 +56,9 @@ const resolveLatestStatus = (
     };
   }
 
-  const sortedHistory = [...statusHistory].sort((a, b) => {
-    const aDate = a.getDataValue('statusStartDate');
-    const bDate = b.getDataValue('statusStartDate');
-
-    if (!aDate && !bDate) {
-      return 0;
-    }
-
-    if (!aDate) {
-      return 1;
-    }
-
-    if (!bDate) {
-      return -1;
-    }
-
-    return new Date(bDate).getTime() - new Date(aDate).getTime();
-  });
+  const sortedHistory = [...statusHistory].sort(
+    (a, b) => (b.getDataValue('idHistorial') ?? 0) - (a.getDataValue('idHistorial') ?? 0)
+  );
 
   const latestHistory = sortedHistory[0];
   const statusInstance = latestHistory.get('status') as RequestStatusInstance | null;
@@ -275,14 +266,33 @@ export const getDashboardDataForUser = async (
   }
 
   if (isAdmin) {
+    // Cada oficina administrativa tiene su propia bandeja de "pendientes de validar",
+    // segun en que etapa del tramite se encuentre la solicitud. Los roles que todavia
+    // no tienen una bandeja propia definida (Administrador general, Consultor)
+    // conservan el comportamiento previo (bandeja de Facultad) hasta que se defina.
+    let queueStatusNames: string[];
+
+    if (normalizedRoleId === SECRETARIA_GENERAL_ROLE_ID) {
+      queueStatusNames = [
+        REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME,
+        ...REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES,
+        REQUEST_STATUS_IN_SG_NAME,
+        ...REQUEST_STATUS_IN_SG_FALLBACK_NAMES
+      ];
+    } else if (normalizedRoleId === UNDEF_ROLE_ID) {
+      queueStatusNames = [REQUEST_STATUS_IN_UNDEF_NAME, ...REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES];
+    } else {
+      queueStatusNames = [REQUEST_STATUS_IN_FACULTY_NAME, ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES];
+    }
+
+    const normalizedQueueStatusNames = queueStatusNames.map((value) => value.toLowerCase());
+
     requests = requests.filter((requestInstance) => {
       const statusHistory =
         (requestInstance.get('statusHistory') as RequestStatusHistoryInstance[] | undefined) ?? [];
       const latest = resolveLatestStatus(statusHistory);
       const normalized = (latest.statusName ?? '').toLowerCase();
-      return [REQUEST_STATUS_IN_FACULTY_NAME, ...REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES]
-        .map((value) => value.toLowerCase())
-        .includes(normalized);
+      return normalizedQueueStatusNames.includes(normalized);
     });
   }
 

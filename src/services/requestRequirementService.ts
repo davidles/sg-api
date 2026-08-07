@@ -25,7 +25,15 @@ import {
   REQUEST_STATUS_TO_FIX_NAME,
   REQUEST_STATUS_TO_FIX_FALLBACK_NAMES,
   REQUEST_STATUS_IN_SG_NAME,
-  REQUEST_STATUS_IN_SG_FALLBACK_NAMES
+  REQUEST_STATUS_IN_SG_FALLBACK_NAMES,
+  REQUEST_STATUS_IN_UNDEF_NAME,
+  REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES,
+  REQUEST_STATUS_DIPLOMA_IN_PROGRESS_NAME,
+  REQUEST_STATUS_DIPLOMA_IN_PROGRESS_FALLBACK_NAMES,
+  REQUEST_STATUS_READY_FOR_PICKUP_NAME,
+  REQUEST_STATUS_READY_FOR_PICKUP_FALLBACK_NAMES,
+  REQUEST_STATUS_FINALIZED_NAME,
+  REQUEST_STATUS_FINALIZED_FALLBACK_NAMES
 } from '../constants/status';
 import requirementResponsibilityMap, {
   RequirementResponsibility,
@@ -174,24 +182,7 @@ export const evaluateRequestStatus = async (
 
   const latestStatus = statusHistory
     .slice()
-    .sort((a, b) => {
-      const aDate = a.getDataValue('statusStartDate');
-      const bDate = b.getDataValue('statusStartDate');
-
-      if (!aDate && !bDate) {
-        return 0;
-      }
-
-      if (!aDate) {
-        return 1;
-      }
-
-      if (!bDate) {
-        return -1;
-      }
-
-      return new Date(bDate).getTime() - new Date(aDate).getTime();
-    })[0];
+    .sort((a, b) => (b.getDataValue('idHistorial') ?? 0) - (a.getDataValue('idHistorial') ?? 0))[0];
 
   const latestStatusInstance = latestStatus?.get('status') as RequestStatusInstance | null;
 
@@ -327,7 +318,7 @@ const ensureRequestStatus = async (
     where: {
       requestId
     },
-    order: [['statusStartDate', 'DESC']],
+    order: [['idHistorial', 'DESC']],
     transaction
   });
 
@@ -515,6 +506,10 @@ export const uploadRequirementFileForRequest = async (
     });
 
     await promoteRequestStatusIfRequirementsCompleted(instance.getDataValue('requestId'), transaction);
+    // También cubre el caso en que quien sube el archivo es la Facultad (ej. Certificado
+    // Provisorio): si con esta carga ya completó todo lo que le corresponde, la solicitud
+    // debe avanzar de "Aceptada por Facultad" a la siguiente etapa.
+    await promoteRequestStatusAfterReview(instance.getDataValue('requestId'), transaction);
   });
 
   return mapToItem(instance);
@@ -625,7 +620,7 @@ const promoteRequestStatusIfRequirementsCompleted = async (
       requirementId
     );
 
-    return responsibility !== RequirementResponsibility.ADMINISTRATIVE;
+    return responsibility === RequirementResponsibility.GRADUATE;
   });
 
   const hasPendingGraduateRequirement = graduateRequirementInstances.some((instance) => {
@@ -654,9 +649,7 @@ const promoteRequestStatusIfRequirementsCompleted = async (
     if (shouldManageTransaction) {
       await transactionToUse.rollback();
     }
-    throw new Error(
-      `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_FACULTY_NAME}". Verificá la configuración de datos.`
-    );
+    return;
   }
 
   try {
@@ -737,19 +730,72 @@ const promoteRequestStatusAfterReview = async (
         requirementId
       );
 
-      return responsibility !== RequirementResponsibility.ADMINISTRATIVE;
+      return responsibility === RequirementResponsibility.GRADUATE;
     });
 
-    const administrativeRequirementInstances = requirementInstances.filter((instance) => {
-      const requirementId = instance.getDataValue('requirementId') ?? null;
-      const responsibility = findResponsibility(
-        requirementResponsibilityMap,
-        requestTypeId,
-        requirementId
+    // Para un grupo de responsabilidad dado (Facultad, Secretaria General, ...) devuelve
+    // solo las instancias que son obligatorias segun el catalogo: las opcionales (ej.
+    // equivalencias) nunca deben bloquear el avance del tramite, aunque queden "Incompleto".
+    const filterRequiredInstances = async (
+      responsibility: RequirementResponsibility
+    ): Promise<RequestRequirementInstanceInstance[]> => {
+      const instancesForResponsibility = requirementInstances.filter((instance) => {
+        const requirementId = instance.getDataValue('requirementId') ?? null;
+        return (
+          findResponsibility(requirementResponsibilityMap, requestTypeId, requirementId) ===
+          responsibility
+        );
+      });
+
+      const requirementIds = instancesForResponsibility
+        .map((instance) => instance.getDataValue('requirementId'))
+        .filter((id): id is number => id !== null && id !== undefined);
+
+      const requiredLinks =
+        requirementIds.length && requestTypeId !== null
+          ? await models.requestTypeRequirement.findAll({
+              where: {
+                requestTypeId,
+                requirementId: { [Op.in]: requirementIds },
+                isRequired: 1
+              },
+              transaction: transactionToUse
+            })
+          : [];
+
+      const requiredRequirementIds = new Set(
+        requiredLinks.map((link) => link.getDataValue('requirementId'))
       );
 
-      return responsibility === RequirementResponsibility.ADMINISTRATIVE;
-    });
+      return instancesForResponsibility.filter((instance) => {
+        const requirementId = instance.getDataValue('requirementId');
+        return requirementId !== null && requiredRequirementIds.has(requirementId);
+      });
+    };
+
+    // "Completo" o "Aceptado" cuentan igual aca: ambos significan que el archivo ya
+    // fue cargado. Una vez aceptado, el estado deja de ser literalmente "Completo",
+    // pero seria un error que eso hiciera retroceder el tramite.
+    const allCompleted = (instances: RequestRequirementInstanceInstance[]): boolean =>
+      instances.every((instance) => {
+        const statusId = instance.getDataValue('currentRequirementStatusId');
+        return statusId === REQUIREMENT_STATUS_COMPLETED_ID || statusId === acceptedId;
+      });
+
+    const allAccepted = (instances: RequestRequirementInstanceInstance[]): boolean =>
+      instances.every((instance) => instance.getDataValue('currentRequirementStatusId') === acceptedId);
+
+    const requiredFacultyInstances = await filterRequiredInstances(RequirementResponsibility.FACULTY);
+    const requiredSecretariaGeneralInstances = await filterRequiredInstances(
+      RequirementResponsibility.SECRETARIA_GENERAL
+    );
+
+    const allRequiredFacultyCompleted = allCompleted(requiredFacultyInstances);
+    const allRequiredSecretariaGeneralCompleted = allCompleted(requiredSecretariaGeneralInstances);
+    // UNDEF valida (acepta) tanto lo que subio Facultad como lo que subio Secretaria
+    // General; recien ahi el diploma pasa a confeccionarse.
+    const allRequiredFacultyAccepted = allAccepted(requiredFacultyInstances);
+    const allRequiredSecretariaGeneralAccepted = allAccepted(requiredSecretariaGeneralInstances);
 
     const hasRejectedGraduate = graduateRequirementInstances.some((instance) => {
       const statusId = instance.getDataValue('currentRequirementStatusId');
@@ -763,34 +809,27 @@ const promoteRequestStatusAfterReview = async (
         return statusId === acceptedId;
       });
 
-    const allAdministrativeCompleted = administrativeRequirementInstances.every((instance) => {
-      const statusId = instance.getDataValue('currentRequirementStatusId');
-      return statusId === REQUIREMENT_STATUS_COMPLETED_ID;
-    });
+    if (!hasRejectedGraduate && allGraduateAccepted) {
+      let targetStatusNames: string[] | null = null;
 
-    if (!hasRejectedGraduate && allGraduateAccepted && !allAdministrativeCompleted) {
-      const acceptedByFacultyStatus = await findRequestStatusByNames(REQUEST_ACCEPTED_BY_FACULTY_NAMES);
-
-      if (!acceptedByFacultyStatus) {
-        throw new Error(
-          `No se encontró el estado de solicitud "${REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME}". Verificá la configuración de datos.`
-        );
+      if (!allRequiredFacultyCompleted) {
+        targetStatusNames = REQUEST_ACCEPTED_BY_FACULTY_NAMES;
+      } else if (!allRequiredSecretariaGeneralCompleted) {
+        targetStatusNames = [REQUEST_STATUS_IN_SG_NAME, ...REQUEST_STATUS_IN_SG_FALLBACK_NAMES];
+      } else if (!allRequiredFacultyAccepted || !allRequiredSecretariaGeneralAccepted) {
+        targetStatusNames = [REQUEST_STATUS_IN_UNDEF_NAME, ...REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES];
+      } else {
+        targetStatusNames = [
+          REQUEST_STATUS_DIPLOMA_IN_PROGRESS_NAME,
+          ...REQUEST_STATUS_DIPLOMA_IN_PROGRESS_FALLBACK_NAMES
+        ];
       }
 
-      await ensureRequestStatus(parsedRequestId, acceptedByFacultyStatus, transactionToUse);
-    } else if (!hasRejectedGraduate && allGraduateAccepted && allAdministrativeCompleted) {
-      const inSgStatus = await findRequestStatusByNames([
-        REQUEST_STATUS_IN_SG_NAME,
-        ...REQUEST_STATUS_IN_SG_FALLBACK_NAMES
-      ]);
+      const targetStatus = await findRequestStatusByNames(targetStatusNames);
 
-      if (!inSgStatus) {
-        throw new Error(
-          `No se encontró el estado de solicitud "${REQUEST_STATUS_IN_SG_NAME}". Verificá la configuración de datos.`
-        );
+      if (targetStatus) {
+        await ensureRequestStatus(parsedRequestId, targetStatus, transactionToUse);
       }
-
-      await ensureRequestStatus(parsedRequestId, inSgStatus, transactionToUse);
     }
 
     if (shouldManageTransaction) {
@@ -850,7 +889,15 @@ export const reviewRequirementForRequest = async (
     throw new Error('No se encontró el requisito para la solicitud indicada');
   }
 
-  const targetStatus = await models.requirementInstanceStatus.findByPk(nextStatusId);
+  let targetStatus: RequirementInstanceStatusInstance | null = null;
+
+  if (nextStatusId === 3) {
+    targetStatus = await findRequirementStatusByNames(REQUIREMENT_ACCEPTED_NAMES);
+  } else if (nextStatusId === 4) {
+    targetStatus = await findRequirementStatusByNames(REQUIREMENT_REJECTED_NAMES);
+  } else {
+    targetStatus = await models.requirementInstanceStatus.findByPk(nextStatusId);
+  }
 
   if (!targetStatus) {
     throw new Error('El estado de requisito indicado no existe');
@@ -862,9 +909,8 @@ export const reviewRequirementForRequest = async (
   const isAccepted = REQUIREMENT_ACCEPTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
   const isRejected = REQUIREMENT_REJECTED_NAMES.map((name) => name.toLowerCase()).includes(normalizedTarget);
 
-  if (!isAccepted && !isRejected) {
-    throw new Error('Solo se permiten estados de revisión aceptado o rechazado');
-  }
+  // En esta iteración permitimos cualquier estado de requisito válido; isAccepted/isRejected
+  // se usan solo para la lógica interna de promoción de la solicitud.
 
   await sequelize.transaction(async (transaction) => {
     const reviewDate = new Date().toISOString();
@@ -915,4 +961,86 @@ export const reviewRequirementForRequest = async (
   });
 
   return mapToItem(instance);
+};
+
+const getLatestRequestStatusName = async (
+  requestId: number,
+  transaction?: Transaction
+): Promise<string | null> => {
+  const latestHistory = await models.requestStatusHistory.findOne({
+    where: { requestId },
+    order: [['idHistorial', 'DESC']],
+    include: [{ model: models.requestStatus, as: 'status' }],
+    transaction
+  });
+
+  const status = latestHistory?.get('status') as RequestStatusInstance | undefined;
+  return status?.getDataValue('requestStatusName') ?? null;
+};
+
+const namesMatch = (name: string | null, candidates: string[]): boolean =>
+  name !== null && candidates.map((value) => value.toLowerCase()).includes(name.toLowerCase());
+
+// Estos dos pasos no dependen de ningun requisito documental: son la confeccion fisica
+// del diploma y su entrega, marcadas a mano por UNDEF.
+export const markDiplomaReadyForPickup = async (requestId: number): Promise<void> => {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    throw new Error('requestId debe ser un número positivo');
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    const currentStatusName = await getLatestRequestStatusName(requestId, transaction);
+
+    if (
+      !namesMatch(currentStatusName, [
+        REQUEST_STATUS_DIPLOMA_IN_PROGRESS_NAME,
+        ...REQUEST_STATUS_DIPLOMA_IN_PROGRESS_FALLBACK_NAMES
+      ])
+    ) {
+      throw new Error(
+        'La solicitud debe estar "En Confección de Diploma" para marcarla como pendiente de retiro.'
+      );
+    }
+
+    const targetStatus = await findRequestStatusByNames([
+      REQUEST_STATUS_READY_FOR_PICKUP_NAME,
+      ...REQUEST_STATUS_READY_FOR_PICKUP_FALLBACK_NAMES
+    ]);
+
+    if (!targetStatus) {
+      throw new Error('No se encontró el estado "Pendiente de Retiro". Verificá la configuración de datos.');
+    }
+
+    await ensureRequestStatus(requestId, targetStatus, transaction);
+  });
+};
+
+export const markDiplomaDelivered = async (requestId: number): Promise<void> => {
+  if (!Number.isInteger(requestId) || requestId <= 0) {
+    throw new Error('requestId debe ser un número positivo');
+  }
+
+  await sequelize.transaction(async (transaction) => {
+    const currentStatusName = await getLatestRequestStatusName(requestId, transaction);
+
+    if (
+      !namesMatch(currentStatusName, [
+        REQUEST_STATUS_READY_FOR_PICKUP_NAME,
+        ...REQUEST_STATUS_READY_FOR_PICKUP_FALLBACK_NAMES
+      ])
+    ) {
+      throw new Error('La solicitud debe estar "Pendiente de Retiro" para marcarla como finalizada.');
+    }
+
+    const targetStatus = await findRequestStatusByNames([
+      REQUEST_STATUS_FINALIZED_NAME,
+      ...REQUEST_STATUS_FINALIZED_FALLBACK_NAMES
+    ]);
+
+    if (!targetStatus) {
+      throw new Error('No se encontró el estado "Finalizada". Verificá la configuración de datos.');
+    }
+
+    await ensureRequestStatus(requestId, targetStatus, transaction);
+  });
 };

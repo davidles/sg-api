@@ -8,7 +8,11 @@ import {
   REQUEST_STATUS_PENDING_NAME,
   REQUIREMENT_STATUS_INITIAL_ID
 } from '../constants/status';
-import { evaluateRequestStatus } from '../services/requestRequirementService';
+import {
+  evaluateRequestStatus,
+  markDiplomaReadyForPickup,
+  markDiplomaDelivered
+} from '../services/requestRequirementService';
 
 type CreateRequestPayload = {
   idUser?: number | string;
@@ -194,4 +198,43 @@ const getRequestEvaluation = async (req: ExpressRequest, res: Response): Promise
   }
 };
 
-export { createRequest, getRequestEvaluation };
+const markRequestDiplomaReady = async (req: ExpressRequest, res: Response): Promise<void> => {
+  try {
+    const requestId = Number(req.params.requestId);
+
+    if (!Number.isInteger(requestId) || requestId <= 0) {
+      res.status(400).json({ message: 'requestId debe ser un número positivo' });
+      return;
+    }
+
+    await markDiplomaReadyForPickup(requestId);
+
+    res.status(200).json({ data: { requestId } });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+  }
+};
+
+const markRequestDiplomaDelivered = async (req: ExpressRequest, res: Response): Promise<void> => {
+  try {
+    const requestId = Number(req.params.requestId);
+
+    if (!Number.isInteger(requestId) || requestId <= 0) {
+      res.status(400).json({ message: 'requestId debe ser un número positivo' });
+      return;
+    }
+
+    await markDiplomaDelivered(requestId);
+
+    res.status(200).json({ data: { requestId } });
+  } catch (error) {
+    res.status(400).json({ message: (error as Error).message });
+  }
+};
+
+export {
+  createRequest,
+  getRequestEvaluation,
+  markRequestDiplomaReady,
+  markRequestDiplomaDelivered
+};
