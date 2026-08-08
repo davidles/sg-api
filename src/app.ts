@@ -27,7 +27,12 @@ const CORS_OPTIONS: CorsOptions = {
 
     return callback(new Error(`Origin ${requestOrigin} not allowed by CORS.`));
   },
-  credentials: true
+  credentials: true,
+  // Sin esto, el navegador recibe el archivo bien pero el JS del frontend no puede
+  // leer el nombre/extension real desde response.headers (Content-Disposition no
+  // esta en la lista de headers "safelisted" por CORS por defecto), y cae al
+  // fallback generico "requisito-<id>.bin".
+  exposedHeaders: ['Content-Disposition']
 };
 
 app.use(cors(CORS_OPTIONS));
