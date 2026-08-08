@@ -549,6 +549,16 @@ export const getRequirementFileForRequest = async (
   let fileName = `requisito_${requirementInstanceId}`;
   let mimeType = 'application/octet-stream';
 
+  // El nombre/extension originales viven en requirementFilePath aunque los bytes
+  // se sirvan desde el BLOB de la base (que es el caso normal hoy en dia): sin esto,
+  // toda descarga salia como "application/octet-stream" sin extension y el sistema
+  // operativo no sabia abrirla como PDF/imagen.
+  if (storedPath) {
+    const extension = path.extname(storedPath).toLowerCase();
+    mimeType = MIME_TYPES_BY_EXTENSION[extension] ?? mimeType;
+    fileName = path.basename(storedPath);
+  }
+
   if (storedBuffer && storedBuffer.length > 0) {
     buffer = storedBuffer;
   } else if (storedPath) {
@@ -561,9 +571,6 @@ export const getRequirementFileForRequest = async (
     }
 
     buffer = fs.readFileSync(absolutePath);
-    const extension = path.extname(absolutePath).toLowerCase();
-    mimeType = MIME_TYPES_BY_EXTENSION[extension] ?? mimeType;
-    fileName = path.basename(absolutePath);
   } else {
     throw new Error('No se pudo recuperar el archivo del requisito.');
   }
