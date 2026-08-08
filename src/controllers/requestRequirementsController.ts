@@ -104,6 +104,7 @@ export const downloadRequestRequirementFile = async (req: Request, res: Response
 
     res.setHeader('Content-Type', filePayload.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${filePayload.fileName}"`);
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).send(filePayload.buffer);
   } catch (error) {
     res.status(400).json({ message: (error as Error).message });
