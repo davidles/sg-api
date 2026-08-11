@@ -35,9 +35,11 @@ import {
   REQUEST_STATUS_FINALIZED_NAME,
   REQUEST_STATUS_FINALIZED_FALLBACK_NAMES
 } from '../constants/status';
+import { calculateRequestDeadline, calculateDaysRemaining } from '../utils/deadline';
 import requirementResponsibilityMap, {
   RequirementResponsibility,
-  findResponsibility
+  findResponsibility,
+  REMOVED_REQUIREMENT_IDS
 } from '../utils/requirementResponsibility';
 
 const ALLOWED_REQUIREMENT_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
@@ -98,7 +100,7 @@ export const getRequirementsForRequest = async (
   }
 
   const instances = await models.requestRequirementInstance.findAll({
-    where: { requestId },
+    where: { requestId, requirementId: { [Op.notIn]: REMOVED_REQUIREMENT_IDS } },
     include: [
       {
         model: models.requirement,
@@ -159,6 +161,8 @@ export const evaluateRequestStatus = async (
   completedGraduateRequirements: number;
   acceptedGraduateRequirements: number;
   hasRejectedGraduateRequirements: boolean;
+  deadlineDate: string | null;
+  daysRemaining: number | null;
 }> => {
   if (!Number.isInteger(requestId) || requestId <= 0) {
     throw new Error('requestId debe ser un número positivo');
@@ -240,6 +244,10 @@ export const evaluateRequestStatus = async (
     }
   }
 
+  const generatedAt = (request.getDataValue('generatedAt') as string | null) ?? null;
+  const isFinalized = (statusName ?? '').toLowerCase() === REQUEST_STATUS_FINALIZED_NAME.toLowerCase();
+  const deadlineDate = isFinalized ? null : calculateRequestDeadline(generatedAt);
+
   return {
     requestId,
     requestStatusId: statusId,
@@ -247,7 +255,9 @@ export const evaluateRequestStatus = async (
     totalGraduateRequirements,
     completedGraduateRequirements,
     acceptedGraduateRequirements,
-    hasRejectedGraduateRequirements
+    hasRejectedGraduateRequirements,
+    deadlineDate,
+    daysRemaining: calculateDaysRemaining(deadlineDate)
   };
 };
 
@@ -609,7 +619,7 @@ const promoteRequestStatusIfRequirementsCompleted = async (
   const requestTypeId = request.getDataValue('requestTypeId') ?? null;
 
   const allRequirementInstances = await models.requestRequirementInstance.findAll({
-    where: { requestId: parsedRequestId },
+    where: { requestId: parsedRequestId, requirementId: { [Op.notIn]: REMOVED_REQUIREMENT_IDS } },
     include: [
       {
         model: models.requirement,
@@ -689,7 +699,8 @@ const promoteRequestStatusAfterReview = async (
   try {
     const requirementInstances = await models.requestRequirementInstance.findAll({
       where: {
-        requestId: parsedRequestId
+        requestId: parsedRequestId,
+        requirementId: { [Op.notIn]: REMOVED_REQUIREMENT_IDS }
       },
       include: [
         {

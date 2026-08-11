@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import models from '../models';
 import type { RequestTypeInstance } from '../models/requestType';
 import type { RequestInstance } from '../models/request';
@@ -28,12 +29,15 @@ import {
   REQUEST_STATUS_IN_SG_NAME,
   REQUEST_STATUS_IN_SG_FALLBACK_NAMES,
   REQUEST_STATUS_IN_UNDEF_NAME,
-  REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES
+  REQUEST_STATUS_IN_UNDEF_FALLBACK_NAMES,
+  REQUEST_STATUS_FINALIZED_NAME
 } from '../constants/status';
+import { calculateRequestDeadline, calculateDaysRemaining } from '../utils/deadline';
 import { mapRoleId, isAdministrativeRole, SECRETARIA_GENERAL_ROLE_ID, UNDEF_ROLE_ID } from '../utils/role';
 import requirementResponsibilityMap, {
   RequirementResponsibility,
-  findResponsibility
+  findResponsibility,
+  REMOVED_REQUIREMENT_IDS
 } from '../utils/requirementResponsibility';
 
 const mapMenuOption = (instance: RequestTypeInstance): DashboardMenuOption => {
@@ -111,11 +115,14 @@ const mapRequestSummary = (
   const faculty = academicProgram?.get('faculty') as FacultyInstance | null;
   const totalRequirements = requirementSummaries.length;
   const completedRequirements = requirementSummaries.filter((item) => item.isCompleted).length;
+  const generatedAt = instance.getDataValue('generatedAt') ?? null;
+  const isFinalized = (statusInfo.statusName ?? '').toLowerCase() === REQUEST_STATUS_FINALIZED_NAME.toLowerCase();
+  const deadlineDate = isFinalized ? null : calculateRequestDeadline(generatedAt);
 
   return {
     idRequest: instance.getDataValue('idRequest'),
     requestTypeName: requestType?.getDataValue('requestTypeName') ?? null,
-    generatedAt: instance.getDataValue('generatedAt') ?? null,
+    generatedAt,
     statusName: statusInfo.statusName,
     statusDescription: statusInfo.statusDescription,
     nextAction: computeNextAction(statusInfo.statusName),
@@ -125,7 +132,9 @@ const mapRequestSummary = (
     planName: studyPlan?.getDataValue('studyPlanName') ?? null,
     totalRequirements,
     completedRequirements,
-    requirements: requirementSummaries
+    requirements: requirementSummaries,
+    deadlineDate,
+    daysRemaining: calculateDaysRemaining(deadlineDate)
   };
 };
 
@@ -230,6 +239,8 @@ export const getDashboardDataForUser = async (
     {
       model: models.requestRequirementInstance,
       as: 'requirementInstances',
+      where: { requirementId: { [Op.notIn]: REMOVED_REQUIREMENT_IDS } },
+      required: false,
       include: [
         { model: models.requirement, as: 'requirement' },
         { model: models.requirementInstanceStatus, as: 'status' }
