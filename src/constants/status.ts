@@ -1,8 +1,8 @@
 export const TITLE_STATUS_PENDING_REQUEST_ID = 1;
 export const TITLE_STATUS_IN_PROCESS_ID = 2;
 export const REQUEST_STATUS_PENDING_NAME = 'Pendiente';
-export const REQUEST_STATUS_IN_FACULTY_NAME = 'En proceso Facultad';
-export const REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES = ['En trámite'];
+export const REQUEST_STATUS_IN_FACULTY_NAME = 'En revisión en la Facultad';
+export const REQUEST_STATUS_IN_FACULTY_FALLBACK_NAMES = ['En proceso Facultad', 'En trámite'];
 export const REQUEST_STATUS_ACCEPTED_BY_FACULTY_NAME = 'Aceptada por Facultad';
 export const REQUEST_STATUS_ACCEPTED_BY_FACULTY_FALLBACK_NAMES = ['Aprobada por Facultad'];
 export const REQUEST_STATUS_TO_FIX_NAME = 'A Subsanar';

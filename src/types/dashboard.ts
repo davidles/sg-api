@@ -34,6 +34,8 @@ export interface DashboardRequestSummary {
   totalRequirements: number | null;
   completedRequirements: number | null;
   requirements?: DashboardRequirementSummary[];
+  deadlineDate: string | null;
+  daysRemaining: number | null;
 }
 
 export interface DashboardData {

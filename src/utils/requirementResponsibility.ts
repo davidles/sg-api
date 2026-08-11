@@ -25,6 +25,14 @@ const requirementResponsibilityMap: RequirementResponsibilityEntry[] = [
   { requestTypeId: 1, requirementId: 12, responsibility: RequirementResponsibility.SECRETARIA_GENERAL },
 ];
 
+// Formulario de Solicitud de Titulo (4) y Formulario de expedicion de titulo (10)
+// dejaron de pedirse como requisitos (feedback de negocio, 2026-08). Ya no se
+// instancian en solicitudes nuevas (se quitaron de tipoSolicitudRequisito), pero
+// solicitudes en curso creadas antes de este cambio pueden tener instancias viejas:
+// se excluyen de listados/evaluaciones y de la logica de "esta todo completo" en
+// todos lados donde se consultan requisitos.
+export const REMOVED_REQUIREMENT_IDS = [4, 10];
+
 export const findResponsibility = (
   entries: RequirementResponsibilityEntry[],
   requestTypeId: number | null,
